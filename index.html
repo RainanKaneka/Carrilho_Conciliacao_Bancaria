@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conciliação Bancária · Carrilho Distribuidora</title>
+  <meta name="description" content="Sistema Inteligente de Conciliação Bancária da Carrilho Distribuidora." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/@phosphor-icons/web@2.1.1/src/index.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { poppins: ['Poppins', 'sans-serif'] },
+          colors: {
+            carrilho: {
+              50: '#f0fdf0', 100: '#dcfcdc', 200: '#bbf7bb', 300: '#86ef86',
+              400: '#4ade4a', 500: '#22c55e', 600: '#038201', 700: '#026901',
+              800: '#025501', 900: '#014301',
+            },
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.4s ease-out both',
+            'slide-up': 'slideUp 0.5s ease-out both',
+            'spin-slow': 'spin 1.5s linear infinite',
+            'pulse-ring': 'pulseRing 2s ease-in-out infinite',
+            'bounce-soft': 'bounceSoft 1s ease-in-out infinite',
+          },
+          keyframes: {
+            fadeIn:    { from: { opacity: '0' }, to: { opacity: '1' } },
+            slideUp:   { from: { opacity: '0', transform: 'translateY(24px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+            pulseRing: { '0%,100%': { transform: 'scale(1)', opacity: '1' }, '50%': { transform: 'scale(1.08)', opacity: '0.7' } },
+            bounceSoft: { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-6px)' } },
+          },
+          boxShadow: {
+            card: '0 2px 16px 0 rgba(3,130,1,0.07), 0 1px 4px 0 rgba(0,0,0,0.06)',
+            'card-hover': '0 8px 32px 0 rgba(3,130,1,0.14), 0 2px 8px 0 rgba(0,0,0,0.08)',
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    * { font-family: 'Poppins', sans-serif; box-sizing: border-box; }
+    body { background-color: #F8F9FA; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: #038201; border-radius: 8px; }
+    .drop-zone { transition: all 0.2s ease; }
+    .drop-zone.drag-over { border-color: #038201 !important; background-color: #f0fdf0 !important; box-shadow: 0 0 0 4px rgba(3,130,1,0.15); transform: scale(1.01); }
+    .file-tag { animation: fadeIn 0.25s ease-out both; }
+    .dots::after { content: ''; animation: dotDot 1.5s steps(4,end) infinite; }
+    @keyframes dotDot { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} 100%{content:''} }
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+    .delay-100{animation-delay:.1s} .delay-200{animation-delay:.2s} .delay-300{animation-delay:.3s}
+    .delay-400{animation-delay:.4s} .delay-500{animation-delay:.5s} .delay-600{animation-delay:.6s}
+  </style>
+</head>
+<body class="min-h-screen bg-[#F8F9FA]">
+
+<!-- HEADER -->
+<header class="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-4">
+      <div class="w-10 h-10 rounded-xl bg-[#038201] flex items-center justify-center flex-shrink-0">
+        <span class="text-white text-[9px] font-bold text-center leading-tight select-none">CARRILHO</span>
+      </div>
+      <div class="hidden sm:block">
+        <h1 class="text-[15px] font-bold text-gray-800 leading-tight">Carrilho <span class="text-[#038201]">Distribuidora</span></h1>
+        <p class="text-[11px] text-gray-400 font-medium tracking-wide">Sistema de Conciliação Bancária</p>
+      </div>
+    </div>
+    <span class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-[#038201] text-xs font-semibold border border-green-100">
+      <i class="ph ph-shield-check text-sm"></i> v2.0 · IA Ativada
+    </span>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="bg-gradient-to-br from-[#038201] via-[#026901] to-[#025501] text-white py-10 px-4">
+  <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
+    <div class="text-center sm:text-left">
+      <p class="text-green-200 text-xs font-semibold uppercase tracking-widest mb-1">Automação Financeira</p>
+      <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight mb-2">Sistema Inteligente de<br class="hidden sm:block" /> Conciliação</h2>
+      <p class="text-white/70 text-sm max-w-md">Cruzamento automático entre extratos do Argos e extratos bancários com 3 regras de IA.</p>
+    </div>
+    <div class="flex gap-5 flex-shrink-0">
+      <div class="text-center"><div class="text-3xl font-extrabold">3</div><div class="text-[11px] text-white/60 font-medium uppercase tracking-wide">Regras IA</div></div>
+      <div class="w-px bg-white/20 self-stretch"></div>
+      <div class="text-center"><div class="text-3xl font-extrabold">100%</div><div class="text-[11px] text-white/60 font-medium uppercase tracking-wide">Auto</div></div>
+      <div class="w-px bg-white/20 self-stretch"></div>
+      <div class="text-center"><div class="text-3xl font-extrabold">.xlsx</div><div class="text-[11px] text-white/60 font-medium uppercase tracking-wide">Saída</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- MAIN -->
+<main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+  <!-- VIEW: UPLOAD -->
+  <div id="view-upload" class="animate-[fadeIn_0.4s_ease-out_both]">
+    <div class="text-center mb-8">
+      <h3 class="text-xl font-bold text-gray-800 mb-1">Selecione os Arquivos</h3>
+      <p class="text-gray-400 text-sm">Arraste e solte ou clique nas áreas abaixo para adicionar os extratos</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <!-- Cartão Argos -->
+      <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-100 hover:shadow-card-hover transition-all duration-300">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+            <i class="ph ph-files text-[#038201] text-xl"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-gray-800 text-sm leading-tight">Arquivos do Sistema Argos</h4>
+            <p class="text-gray-400 text-xs">Relatório de baixas exportado do ERP</p>
+          </div>
+        </div>
+        <div id="drop-argos" class="drop-zone border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-[#038201] hover:bg-green-50 transition-all duration-200"
+          onclick="document.getElementById('input-argos').click()"
+          ondragover="handleDragOver(event,'drop-argos')"
+          ondragleave="handleDragLeave(event,'drop-argos')"
+          ondrop="handleDrop(event,'argos')">
+          <div class="flex flex-col items-center gap-3">
+            <div class="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center">
+              <i class="ph ph-file-xls text-[#038201] text-3xl"></i>
+            </div>
+            <div>
+              <p class="text-gray-600 font-medium text-sm">Arraste os extratos do Argos (.xlsx)</p>
+              <p class="text-gray-400 text-xs mt-0.5">ou <span class="text-[#038201] font-semibold underline underline-offset-2">clique para procurar</span></p>
+            </div>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">
+              <i class="ph ph-file-text text-xs"></i> .xlsx · múltiplos arquivos
+            </span>
+          </div>
+        </div>
+        <input id="input-argos" type="file" accept=".xlsx,.xls,.csv" multiple class="hidden" onchange="handleFileInput(event,'argos')" />
+        <div id="list-argos" class="mt-4 space-y-2 hidden"></div>
+      </div>
+
+      <!-- Cartão Banco -->
+      <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-100 hover:shadow-card-hover transition-all duration-300">
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+            <i class="ph ph-bank text-[#038201] text-xl"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-gray-800 text-sm leading-tight">Extratos Bancários</h4>
+            <p class="text-gray-400 text-xs">Caixa Econômica · Banese · outros</p>
+          </div>
+        </div>
+        <div id="drop-bank" class="drop-zone border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-[#038201] hover:bg-green-50 transition-all duration-200"
+          onclick="document.getElementById('input-bank').click()"
+          ondragover="handleDragOver(event,'drop-bank')"
+          ondragleave="handleDragLeave(event,'drop-bank')"
+          ondrop="handleDrop(event,'bank')">
+          <div class="flex flex-col items-center gap-3">
+            <div class="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center">
+              <i class="ph ph-currency-circle-dollar text-[#038201] text-3xl"></i>
+            </div>
+            <div>
+              <p class="text-gray-600 font-medium text-sm">Arraste os extratos do Banco (.xlsx)</p>
+              <p class="text-gray-400 text-xs mt-0.5">ou <span class="text-[#038201] font-semibold underline underline-offset-2">clique para procurar</span></p>
+            </div>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">
+              <i class="ph ph-file-text text-xs"></i> .xlsx · múltiplos arquivos
+            </span>
+          </div>
+        </div>
+        <input id="input-bank" type="file" accept=".xlsx,.xls,.csv" multiple class="hidden" onchange="handleFileInput(event,'bank')" />
+        <div id="list-bank" class="mt-4 space-y-2 hidden"></div>
+      </div>
+    </div>
+
+    <!-- Seletor de Banco -->
+    <div class="flex items-center justify-center gap-3 mb-4">
+      <label for="select-banco" class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Banco do extrato:</label>
+      <select id="select-banco"
+        class="text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl px-4 py-2 shadow-sm cursor-pointer hover:border-[#038201] focus:outline-none focus:ring-2 focus:ring-[#038201]/20 transition-all">
+        <option value="generico">Genérico (auto-detect)</option>
+        <option value="banese">Banese</option>
+        <option value="caixa">Caixa Econômica</option>
+      </select>
+    </div>
+
+    <!-- Botão Principal -->
+    <div class="flex flex-col items-center gap-3">
+      <p id="btn-hint" class="text-gray-400 text-xs transition-all duration-300">Adicione pelo menos um arquivo de cada tipo para continuar</p>
+      <button id="btn-start" onclick="startReconciliation()" disabled
+        class="relative flex items-center gap-3 px-10 py-4 rounded-2xl font-bold text-base tracking-wide transition-all duration-300 bg-gray-300 text-gray-400 cursor-not-allowed">
+        <i class="ph ph-arrows-left-right text-xl"></i>
+        INICIAR CONCILIAÇÃO
+      </button>
+      <div class="flex flex-wrap justify-center items-center gap-4 mt-1">
+        <div class="flex items-center gap-1.5 text-xs text-gray-400"><i class="ph ph-check-circle text-[#038201] text-sm"></i>Regra 1 · Match Exato</div>
+        <div class="flex items-center gap-1.5 text-xs text-gray-400"><i class="ph ph-check-circle text-[#038201] text-sm"></i>Regra 2 · Regex Histórico</div>
+        <div class="flex items-center gap-1.5 text-xs text-gray-400"><i class="ph ph-check-circle text-[#038201] text-sm"></i>Regra 3 · Desmembrados</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW: LOADING -->
+  <div id="view-loading" class="hidden">
+    <div class="flex flex-col items-center justify-center py-20 gap-8">
+      <div class="relative w-28 h-28">
+        <svg class="w-full h-full animate-spin-slow" viewBox="0 0 100 100" fill="none">
+          <circle cx="50" cy="50" r="44" stroke="#e5e7eb" stroke-width="8"/>
+          <circle cx="50" cy="50" r="44" stroke="#038201" stroke-width="8" stroke-dasharray="207 69" stroke-dashoffset="17" stroke-linecap="round"/>
+        </svg>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <i class="ph ph-arrows-left-right text-[#038201] text-3xl animate-pulse-ring"></i>
+        </div>
+      </div>
+      <div class="text-center">
+        <p class="text-gray-800 font-semibold text-lg mb-1">Processando Conciliação<span class="dots"></span></p>
+        <p class="text-gray-400 text-sm">Cruzando milhares de registros — isso pode levar alguns segundos.</p>
+      </div>
+      <div class="w-full max-w-md">
+        <div class="flex justify-between text-xs text-gray-400 mb-2 font-medium">
+          <span id="progress-label">Iniciando leitura dos arquivos</span>
+          <span id="progress-pct">0%</span>
+        </div>
+        <div class="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+          <div id="progress-bar" style="width:0%;transition:width 0.5s ease" class="h-full bg-gradient-to-r from-[#038201] to-green-400 rounded-full"></div>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-lg">
+        <div id="step-1" class="flex items-center gap-2 bg-white rounded-xl p-3 shadow-card border border-gray-100 opacity-40 transition-all duration-500">
+          <i class="ph ph-magnifying-glass text-[#038201] text-lg flex-shrink-0"></i>
+          <span class="text-xs font-medium text-gray-600">Match Exato</span>
+        </div>
+        <div id="step-2" class="flex items-center gap-2 bg-white rounded-xl p-3 shadow-card border border-gray-100 opacity-40 transition-all duration-500">
+          <i class="ph ph-code text-[#038201] text-lg flex-shrink-0"></i>
+          <span class="text-xs font-medium text-gray-600">Regex Histórico</span>
+        </div>
+        <div id="step-3" class="flex items-center gap-2 bg-white rounded-xl p-3 shadow-card border border-gray-100 opacity-40 transition-all duration-500">
+          <i class="ph ph-git-merge text-[#038201] text-lg flex-shrink-0"></i>
+          <span class="text-xs font-medium text-gray-600">Desmembrados</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW: RESULTS -->
+  <div id="view-results" class="hidden">
+    <!-- Banner -->
+    <div class="flex items-center gap-3 bg-green-50 border border-green-100 rounded-2xl px-5 py-4 mb-8">
+      <div class="w-10 h-10 rounded-xl bg-[#038201] flex items-center justify-center flex-shrink-0">
+        <i class="ph ph-check-fat text-white text-xl"></i>
+      </div>
+      <div>
+        <p class="font-bold text-green-800 text-sm">Conciliação Concluída com Sucesso!</p>
+        <p id="kpi-total" class="text-green-600 text-xs">Planilha pronta para download</p>
+      </div>
+      <div class="ml-auto text-right hidden sm:block">
+        <p class="text-green-600 text-xs font-medium">Taxa de Conciliação</p>
+        <p id="kpi-taxa" class="text-green-800 font-bold text-sm">—</p>
+      </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.1s_both]">
+        <div class="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center mx-auto mb-3"><i class="ph ph-check-circle text-[#038201] text-2xl"></i></div>
+        <div id="kpi-perfeito" class="text-3xl font-extrabold text-[#038201] mb-1">—</div>
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">Conciliados<br/>Perfeitos</div>
+        <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 text-[#038201] text-[10px] font-semibold"><i class="ph ph-trend-up text-xs"></i>Regra 1</div>
+      </div>
+      <div class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.2s_both]">
+        <div class="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-3"><i class="ph ph-code text-blue-500 text-2xl"></i></div>
+        <div id="kpi-historico" class="text-3xl font-extrabold text-blue-500 mb-1">—</div>
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">Via<br/>Histórico</div>
+        <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-500 text-[10px] font-semibold"><i class="ph ph-regex text-xs"></i>Regra 2</div>
+      </div>
+      <div class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.3s_both]">
+        <div class="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-3"><i class="ph ph-git-merge text-purple-500 text-2xl"></i></div>
+        <div id="kpi-desmembrado" class="text-3xl font-extrabold text-purple-500 mb-1">—</div>
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">Valores<br/>Desmembrados</div>
+        <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 text-purple-500 text-[10px] font-semibold"><i class="ph ph-intersect text-xs"></i>Regra 3</div>
+      </div>
+      <div class="bg-white rounded-2xl shadow-card border border-amber-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.4s_both] relative overflow-hidden">
+        <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-red-400 rounded-t-2xl"></div>
+        <div class="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-3 mt-1"><i class="ph ph-warning text-amber-500 text-2xl"></i></div>
+        <div id="kpi-divergencias" class="text-3xl font-extrabold text-amber-500 mb-1">—</div>
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">Divergências<br/>Pendentes</div>
+        <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 text-[10px] font-semibold"><i class="ph ph-hand-pointing text-xs"></i>Ação Manual</div>
+      </div>
+    </div>
+
+    <!-- Barra Visual -->
+    <div class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 mb-8 animate-[slideUp_0.5s_ease-out_0.5s_both]">
+      <div class="flex justify-between items-center mb-3">
+        <p class="text-sm font-semibold text-gray-700">Taxa de Conciliação Automática</p>
+        <p id="kpi-taxa-barra" class="text-lg font-extrabold text-[#038201]">—</p>
+      </div>
+      <div id="barra-dist" class="w-full h-3 bg-gray-100 rounded-full overflow-hidden flex gap-0.5">
+        <div class="h-full bg-[#038201] rounded-l-full transition-all duration-700" style="width:0%"></div>
+        <div class="h-full bg-blue-400 transition-all duration-700" style="width:0%"></div>
+        <div class="h-full bg-purple-400 transition-all duration-700" style="width:0%"></div>
+        <div class="h-full bg-amber-400 rounded-r-full transition-all duration-700" style="width:0%"></div>
+      </div>
+      <div class="legenda-dist flex flex-wrap gap-4 mt-3">
+        <div class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-[#038201] flex-shrink-0"></span><span>Perfeitos</span></div>
+        <div class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-blue-400 flex-shrink-0"></span><span>Via Histórico</span></div>
+        <div class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-purple-400 flex-shrink-0"></span><span>Desmembrados</span></div>
+        <div class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0"></span><span>Divergências</span></div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex flex-col sm:flex-row gap-4 justify-center animate-[slideUp_0.5s_ease-out_0.6s_both]">
+      <button onclick="triggerDownload()" id="btn-download"
+        class="flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-[#038201] text-white font-bold text-base shadow-[0_4px_24px_rgba(3,130,1,0.35)] hover:bg-[#026901] hover:shadow-[0_8px_32px_rgba(3,130,1,0.45)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
+        <i class="ph ph-file-arrow-down text-2xl"></i>
+        📥 Baixar Planilha de Conciliação (.xlsx)
+      </button>
+      <button onclick="resetApp()"
+        class="flex items-center justify-center gap-2 px-6 py-4 rounded-2xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:border-[#038201] hover:text-[#038201] hover:bg-green-50 transition-all duration-200 cursor-pointer">
+        <i class="ph ph-arrow-counter-clockwise text-lg"></i>
+        Fazer Nova Conciliação
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<!-- FOOTER -->
+<footer class="mt-16 border-t border-gray-100 bg-white">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+    <p class="text-xs text-gray-400">© 2026 <span class="font-semibold text-gray-500">Carrilho Distribuidora</span> · Sistema de Conciliação Bancária v2.0</p>
+    <div class="flex items-center gap-2 text-xs text-gray-400">
+      <i class="ph ph-lock-simple text-[#038201] text-sm"></i>
+      Seus arquivos são processados localmente e não são enviados à nuvem.
+    </div>
+  </div>
+</footer>
+
+<!-- TOAST -->
+<div id="toast" class="fixed bottom-6 right-6 z-50 hidden max-w-xs">
+  <div class="flex items-start gap-3 bg-white rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-gray-100 p-4 animate-[slideUp_0.3s_ease-out_both]">
+    <i id="toast-icon" class="ph ph-check-circle text-[#038201] text-xl flex-shrink-0 mt-0.5"></i>
+    <div>
+      <p id="toast-title" class="text-sm font-semibold text-gray-800"></p>
+      <p id="toast-body" class="text-xs text-gray-400 mt-0.5"></p>
+    </div>
+    <button onclick="hideToast()" class="ml-auto text-gray-300 hover:text-gray-500 transition-colors">
+      <i class="ph ph-x text-sm"></i>
+    </button>
+  </div>
+</div>
+
+<script>
+  const state = { argos: [], bank: [] };
+
+  function handleDragOver(e, id) {
+    e.preventDefault(); e.stopPropagation();
+    document.getElementById(id).classList.add('drag-over');
+  }
+  function handleDragLeave(e, id) {
+    e.preventDefault(); e.stopPropagation();
+    document.getElementById(id).classList.remove('drag-over');
+  }
+  function handleDrop(e, type) {
+    e.preventDefault(); e.stopPropagation();
+    const id = type === 'argos' ? 'drop-argos' : 'drop-bank';
+    document.getElementById(id).classList.remove('drag-over');
+    const files = Array.from(e.dataTransfer.files).filter(isValidFile);
+    if (!files.length) { showToast('Formato inválido', 'Use arquivos .xlsx, .xls ou .csv', 'warning'); return; }
+    addFiles(type, files);
+  }
+  function handleFileInput(e, type) {
+    addFiles(type, Array.from(e.target.files).filter(isValidFile));
+    e.target.value = '';
+  }
+  function isValidFile(f) { return ['xlsx','xls','csv'].includes(f.name.split('.').pop().toLowerCase()); }
+
+  function addFiles(type, files) {
+    const existing = new Set(state[type].map(f => f.name));
+    const newFiles = files.filter(f => !existing.has(f.name));
+    if (!newFiles.length) { showToast('Já adicionado', 'Esses arquivos já estão na lista.', 'info'); return; }
+    state[type].push(...newFiles);
+    renderFileList(type);
+    updateButton();
+    showToast(`${newFiles.length} arquivo(s) adicionado(s)`, newFiles.map(f => truncate(f.name)).join(', '), 'success');
+  }
+
+  function removeFile(type, name) {
+    state[type] = state[type].filter(f => f.name !== name);
+    renderFileList(type); updateButton();
+  }
+
+  function renderFileList(type) {
+    const el = document.getElementById('list-' + type);
+    if (!state[type].length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+    el.classList.remove('hidden');
+    el.innerHTML = state[type].map(f => `
+      <div class="file-tag flex items-center gap-3 bg-green-50 border border-green-100 rounded-xl px-3 py-2.5">
+        <i class="ph ph-file-xls text-[#038201] text-base flex-shrink-0"></i>
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-semibold text-gray-700 truncate" title="${esc(f.name)}">${esc(truncate(f.name))}</p>
+          <p class="text-[10px] text-gray-400">${fmtSize(f.size)}</p>
+        </div>
+        <button onclick="removeFile('${type}','${esc(f.name)}')" class="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all">
+          <i class="ph ph-x text-sm"></i>
+        </button>
+      </div>`).join('');
+  }
+
+  function updateButton() {
+    const btn = document.getElementById('btn-start');
+    const hint = document.getElementById('btn-hint');
+    const hasA = state.argos.length > 0, hasB = state.bank.length > 0;
+    if (hasA && hasB) {
+      btn.disabled = false;
+      btn.className = 'relative flex items-center gap-3 px-10 py-4 rounded-2xl font-bold text-base tracking-wide transition-all duration-300 bg-[#038201] text-white cursor-pointer shadow-[0_4px_24px_rgba(3,130,1,0.35)] hover:bg-[#026901] hover:shadow-[0_8px_32px_rgba(3,130,1,0.45)] hover:-translate-y-0.5';
+      hint.textContent = state.argos.length + ' arquivo(s) Argos · ' + state.bank.length + ' extrato(s) bancário(s) prontos';
+      hint.className = 'text-[#038201] text-xs font-medium transition-all duration-300';
+    } else {
+      btn.disabled = true;
+      btn.className = 'relative flex items-center gap-3 px-10 py-4 rounded-2xl font-bold text-base tracking-wide transition-all duration-300 bg-gray-300 text-gray-400 cursor-not-allowed';
+      hint.textContent = !hasA && !hasB ? 'Adicione pelo menos um arquivo de cada tipo para continuar'
+        : !hasA ? 'Falta: adicione pelo menos 1 arquivo do Sistema Argos'
+        : 'Falta: adicione pelo menos 1 extrato bancário';
+      hint.className = 'text-gray-400 text-xs transition-all duration-300';
+    }
+  }
+
+  // URL base da API — quando servido pelo app.py usa rota relativa
+  const API_BASE = window.location.port === '8000' ? '' : 'http://localhost:8000';
+
+  const STEPS = [
+    {pct:15, label:'Enviando arquivos para o servidor...'},
+    {pct:30, label:'Lendo e limpando dados do Argos...'},
+    {pct:50, label:'Regra 1: Match Exato em execução...'},
+    {pct:70, label:'Regra 2: Análise de Histórico (Regex)...'},
+    {pct:88, label:'Regra 3: Combinação de Valores Desmembrados...'},
+    {pct:98, label:'Gerando planilha de resultados...'},
+  ];
+
+  // Armazena o Blob do Excel retornado pela API para o botão de download
+  let _excelBlob = null;
+  let _resultados = null;
+
+  async function startReconciliation() {
+    showView('loading');
+    _excelBlob = null;
+    _resultados = null;
+
+    // Anima a barra de progresso enquanto a API processa
+    const bar=document.getElementById('progress-bar');
+    const pctEl=document.getElementById('progress-pct');
+    const lbl=document.getElementById('progress-label');
+    let stepIdx=0;
+    let progressTimer;
+
+    const advanceStep = () => {
+      if(stepIdx>=STEPS.length) return;
+      const s=STEPS[stepIdx];
+      bar.style.width=s.pct+'%'; pctEl.textContent=s.pct+'%'; lbl.textContent=s.label;
+      if(s.pct>=50) activateStep('step-1');
+      if(s.pct>=70) activateStep('step-2');
+      if(s.pct>=88) activateStep('step-3');
+      stepIdx++;
+      if(stepIdx<STEPS.length) progressTimer=setTimeout(advanceStep,700);
+    };
+    setTimeout(advanceStep,300);
+
+    try {
+      // Monta o FormData com todos os arquivos
+      const form = new FormData();
+      state.argos.forEach(f => form.append('argos_files', f));
+      state.bank.forEach(f  => form.append('banco_files', f));
+
+      // Lê o banco selecionado no select (se existir)
+      const bancoSelect = document.getElementById('select-banco');
+      const bancoNome = bancoSelect ? bancoSelect.value : 'generico';
+      form.append('banco_nome', bancoNome);
+
+      // Chama a API — pode levar vários segundos dependendo do volume
+      const resp = await fetch(API_BASE + '/api/conciliar', {
+        method: 'POST',
+        body: form,
+      });
+
+      clearTimeout(progressTimer);
+
+      if(!resp.ok) {
+        // Tenta ler a mensagem de erro do servidor
+        let msg = 'Erro desconhecido no servidor.';
+        try {
+          const errJson = await resp.json();
+          msg = errJson.detail || msg;
+        } catch(_) {}
+        throw new Error(msg);
+      }
+
+      // Sucesso: recebe o JSON com resultados + arquivo em Base64
+      const dados = await resp.json();
+
+      // Guarda os dados de resultado para preencher os KPIs
+      _resultados = dados.resultados;      // { perfeitos, historico, desmembrados, divergencias }
+
+      // Converte a string Base64 de volta para Blob .xlsx
+      const byteCharacters = atob(dados.ficheiro_base64);
+      const byteNumbers = new Uint8Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      _excelBlob = new Blob(
+        [byteNumbers],
+        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+      );
+
+      // Completa a barra
+      bar.style.width='100%'; pctEl.textContent='100%';
+      lbl.textContent='Conciliação concluída! Preparando resultados...';
+      activateStep('step-1'); activateStep('step-2'); activateStep('step-3');
+
+      setTimeout(()=>{
+        _preencherResultados(_resultados, dados.taxa_conciliacao, dados.total_registros);
+        showView('results');
+      }, 600);
+
+    } catch(err) {
+      clearTimeout(progressTimer);
+      showView('upload');
+      showToast(
+        'Erro na conciliação',
+        err.message || 'Verifique se o servidor app.py está em execução.',
+        'error'
+      );
+      console.error('[API Error]', err);
+    }
+  }
+
+  /**
+   * Preenche os KPIs de resultado com dados reais da API.
+   *
+   * @param {Object} res      - { perfeitos, historico, desmembrados, divergencias }
+   * @param {number} taxaApi  - Porcentagem calculada no servidor (fallback se calc local falhar)
+   * @param {number} total    - Total de registros processados
+   */
+  function _preencherResultados(res, taxaApi, total) {
+    if (!res) return;
+
+    // 1. Preenche os 4 cartões
+    const mapa = [
+      { campo: 'perfeitos',     id: 'kpi-perfeito'     },
+      { campo: 'historico',     id: 'kpi-historico'    },
+      { campo: 'desmembrados',  id: 'kpi-desmembrado'  },
+      { campo: 'divergencias',  id: 'kpi-divergencias' },
+    ];
+    mapa.forEach(({ campo, id }) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = res[campo] ?? '—';
+    });
+
+    // 2. Total de registros no banner
+    const elTotal = document.getElementById('kpi-total');
+    if (elTotal) {
+      elTotal.textContent = (total ?? 0) + ' registros processados · Planilha pronta para download';
+    }
+
+    // 3. Porcentagem calculada dinamicamente
+    const perfeitos    = res.perfeitos    || 0;
+    const historico    = res.historico    || 0;
+    const desmembrados = res.desmembrados || 0;
+    const divergencias = res.divergencias || 0;
+    const totalCalc    = perfeitos + historico + desmembrados + divergencias;
+    const sucesso      = perfeitos + historico + desmembrados;
+    const pct          = totalCalc > 0
+      ? Math.round((sucesso / totalCalc) * 100 * 10) / 10   // 1 casa decimal
+      : (taxaApi ?? 0);
+
+    const elTaxa = document.getElementById('kpi-taxa');
+    if (elTaxa) elTaxa.textContent = pct.toFixed(1) + '%';
+    const elTaxaBarra = document.getElementById('kpi-taxa-barra');
+    if (elTaxaBarra) elTaxaBarra.textContent = pct.toFixed(1) + '%';
+
+    // 4. Atualiza a barra de distribuição visual proporcional
+    if (totalCalc > 0) {
+      const pPerf = ((perfeitos    / totalCalc) * 100).toFixed(1);
+      const pHist = ((historico    / totalCalc) * 100).toFixed(1);
+      const pDesm = ((desmembrados / totalCalc) * 100).toFixed(1);
+      const pDiv  = ((divergencias / totalCalc) * 100).toFixed(1);
+
+      const bars = document.querySelectorAll('#barra-dist > div');
+      if (bars.length === 4) {
+        bars[0].style.width = pPerf + '%'; bars[0].title = `Perfeitos: ${perfeitos} (${pPerf}%)`;
+        bars[1].style.width = pHist + '%'; bars[1].title = `Via Histórico: ${historico} (${pHist}%)`;
+        bars[2].style.width = pDesm + '%'; bars[2].title = `Desmembrados: ${desmembrados} (${pDesm}%)`;
+        bars[3].style.width = pDiv  + '%'; bars[3].title = `Divergências: ${divergencias} (${pDiv}%)`;
+      }
+
+      // Atualiza as legendas — seleciona apenas os spans de texto (segundo filho de cada item)
+      const legs = document.querySelectorAll('.legenda-dist > div > span:last-child');
+      if (legs.length === 4) {
+        legs[0].textContent = `Perfeitos (${pPerf}%)`;
+        legs[1].textContent = `Via Histórico (${pHist}%)`;
+        legs[2].textContent = `Desmembrados (${pDesm}%)`;
+        legs[3].textContent = `Divergências (${pDiv}%)`;
+      }
+    }
+  }
+
+  function activateStep(id) {
+    const el=document.getElementById(id);
+    el.classList.remove('opacity-40'); el.classList.add('opacity-100','border-green-200','bg-green-50');
+  }
+
+  function showView(view) {
+    ['upload','loading','results'].forEach(v=>{
+      document.getElementById('view-'+v).classList[v===view?'remove':'add']('hidden');
+    });
+  }
+
+  function resetApp() {
+    state.argos=[]; state.bank=[];
+    renderFileList('argos'); renderFileList('bank'); updateButton();
+    document.getElementById('progress-bar').style.width='0%';
+    document.getElementById('progress-pct').textContent='0%';
+    document.getElementById('progress-label').textContent='Iniciando leitura dos arquivos';
+    ['step-1','step-2','step-3'].forEach(id=>{
+      const el=document.getElementById(id);
+      el.classList.add('opacity-40'); el.classList.remove('opacity-100','border-green-200','bg-green-50');
+    });
+    showView('upload');
+    showToast('Pronto!','Os campos foram limpos com sucesso.','info');
+  }
+
+  function triggerDownload() {
+    if(!_excelBlob) {
+      showToast('Arquivo indisponível','Execute a conciliação primeiro.','warning');
+      return;
+    }
+    // _excelBlob já é um Blob .xlsx construído a partir do Base64 da API
+    const url = URL.createObjectURL(_excelBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Conciliacao_Final.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+    showToast('Download iniciado!','Conciliacao_Final.xlsx foi salvo com sucesso.','success');
+  }
+
+  let toastTimer=null;
+  function showToast(title,body,type='success'){
+    const el=document.getElementById('toast'),icon=document.getElementById('toast-icon');
+    const cfg={success:{i:'ph-check-circle',c:'text-[#038201]'},warning:{i:'ph-warning',c:'text-amber-500'},info:{i:'ph-info',c:'text-blue-500'},error:{i:'ph-x-circle',c:'text-red-500'}};
+    const c=cfg[type]||cfg.success;
+    icon.className=`ph ${c.i} ${c.c} text-xl flex-shrink-0 mt-0.5`;
+    document.getElementById('toast-title').textContent=title;
+    document.getElementById('toast-body').textContent=body;
+    el.classList.remove('hidden');
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer=setTimeout(hideToast,4000);
+  }
+  function hideToast(){ document.getElementById('toast').classList.add('hidden'); }
+
+  function fmtSize(b){ return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'; }
+  function truncate(s){ return s.length>38?s.slice(0,35)+'...':s; }
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+
+  updateButton();
+</script>
+</body>
+</html>

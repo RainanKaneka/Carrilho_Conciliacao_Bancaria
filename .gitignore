@@ -1,0 +1,14 @@
+*.xlsx
+*.xls
+*.csv
+
+temp_*/
+temp_uploads/
+
+pycache/
+*.pyc
+.DS_Store
+
+venv/
+env/
+.env
