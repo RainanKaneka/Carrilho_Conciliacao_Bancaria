@@ -6,8 +6,8 @@ import itertools
 import argparse
 import warnings
 
-# Bibliotecas para pintar e formatar o Excel
-from openpyxl.styles import PatternFill, Font, Alignment
+# Bibliotecas para pintar e formatar o Excel (Bordas adicionadas!)
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 warnings.filterwarnings('ignore')
@@ -152,6 +152,15 @@ class ReconciliationEngine:
             if match:
                 try: v_regex = float(match.group(1).replace('.', '').replace(',', '.'))
                 except: continue
+
+                # --- NOVA TRAVA DE SEGURANÇA ---
+                # Se a diferença entre a nota e o texto for muito grande (> 15 reais),
+                # não é um erro de centavos, é um PIX desmembrado que o vendedor anotou na observação!
+                # Ignoramos na Regra 2 e deixamos a Regra 3 somar as notas.
+                if abs(row_a['Valor'] - v_regex) > 15.0:
+                    continue
+                # -------------------------------
+
                 d_argos = row_a['Data']
                 candidatos = self.df_bank[
                     (self.df_bank['status'] == 'pendente') &
@@ -315,47 +324,103 @@ class ExcelReporter:
                     if 'data' in col.lower() or 'DATA' in col.upper():
                         df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%d/%m/%Y').replace('NaT', '')
 
-                df.to_excel(writer, sheet_name=sheet_name, index=False)
+                # Escreve a tabela começando na linha 5 (index 4) para deixar espaço para a Logomarca
+                df.to_excel(writer, sheet_name=sheet_name, index=False, startrow=4)
                 worksheet = writer.sheets[sheet_name]
 
-                # --- PALETA DE CORES DEFINIDA ---
-                fill_caixa = PatternFill(start_color='00407B', end_color='00407B', fill_type='solid') 
-                fill_banese = PatternFill(start_color='356A1C', end_color='356A1C', fill_type='solid') 
-                
-                header_fill_banco = PatternFill(start_color='023465', end_color='023465', fill_type='solid')
-                header_fill_normal = PatternFill(start_color='F2F2F2', end_color='F2F2F2', fill_type='solid')
-                
-                fill_zebra = PatternFill(start_color='669D4C', end_color='669D4C', fill_type='solid')
+                # --- NOVA PALETA DE CORES INSTITUCIONAIS E FONTES ---
+                header_fill = PatternFill(start_color='266C40', end_color='266C40', fill_type='solid')
+                fill_verde_claro = PatternFill(start_color='719C82', end_color='719C82', fill_type='solid')
+                fill_branco = PatternFill(start_color='FFFFFF', end_color='FFFFFF', fill_type='solid')
                 
                 font_branca_bold = Font(color='FFFFFF', bold=True)
-                font_branca_normal = Font(color='FFFFFF')
+                font_preta_bold = Font(color='000000', bold=True) # Letra PRETA e NEGRITO
+                
+                # --- NOVA BORDA 356a1c ---
+                borda_fina = Border(
+                    left=Side(border_style='thin', color='356A1C'),
+                    right=Side(border_style='thin', color='356A1C'),
+                    top=Side(border_style='thin', color='356A1C'),
+                    bottom=Side(border_style='thin', color='356A1C')
+                )
 
-                col_indices = {str(worksheet.cell(row=1, column=i).value).upper(): i for i in range(1, worksheet.max_column + 1)}
+                col_indices = {str(worksheet.cell(row=5, column=i).value).upper(): i for i in range(1, worksheet.max_column + 1)}
+                max_col = worksheet.max_column
 
-                # 1. Formatação Visual de Cabeçalhos
-                for cell in worksheet[1]:
-                    col_name = str(cell.value).upper()
-                    # As colunas BANCO e BAIXAS recebem o fundo #023465 e fonte branca
-                    if col_name in ['BANCO', 'BAIXAS']:
-                        cell.fill = header_fill_banco
-                        cell.font = font_branca_bold
-                    else:
-                        cell.fill = header_fill_normal
-                        cell.font = Font(bold=True)
-                    cell.alignment = Alignment(horizontal='center', vertical='center')
+                # 0. Fundo verde nas 4 primeiras linhas
+                for r in range(1, 5):
+                    for c in range(1, max_col + 1):
+                        worksheet.cell(row=r, column=c).fill = fill_verde_claro
+                
+                # --- NOVO: Definir alturas exatas para evitar que a imagem invada a tabela ---
+                worksheet.row_dimensions[1].height = 12 # Respiro superior
+                worksheet.row_dimensions[2].height = 55 # Espaço principal (comporta a imagem de 65px perfeitamente)
+                worksheet.row_dimensions[3].height = 12 # Respiro inferior
+                worksheet.row_dimensions[4].height = 12 # Margem antes do cabeçalho da tabela
 
-                # As colunas onde queremos aplicar o padrão Zebrado
-                colunas_zebra = ['CLIENTES', 'VALOR', 'DATA BAIXA', 'OBS']
+                # --- INSERIR LOGOMARCA CENTRALIZADA E PROPORCIONAL ---
+                try:
+                    from openpyxl.drawing.image import Image as ExcelImage
+                    from PIL import Image as PILImage
+                    import glob
+                    # Procura qualquer imagem dentro da pasta 'img'
+                    imagens = glob.glob("img/*.*")
+                    if imagens:
+                        # 1. Pega o tamanho original da imagem para não distorcer
+                        pil_img = PILImage.open(imagens[0])
+                        largura_original, altura_original = pil_img.size
+                        
+                        # 2. Define uma altura fixa para caber com folga (65 pixels)
+                        nova_altura = 65
+                        
+                        # 3. Calcula a largura proporcional para NÃO ESTICAR (Regra de 3)
+                        nova_largura = int((nova_altura / altura_original) * largura_original)
+                        
+                        img = ExcelImage(imagens[0])
+                        img.width = nova_largura
+                        img.height = nova_altura
+                        
+                        # 4. Centralização Visual:
+                        if max_col <= 7:
+                            coluna_alvo = 4  # Coluna D (Centro exato para abas de 7 colunas)
+                        else:
+                            coluna_alvo = 5  # Coluna E (Centro exato para a aba de Divergências)
+                            
+                        col_letra_alvo = get_column_letter(coluna_alvo)
+                        
+                        # 5. MUDANÇA CRUCIAL: Ancorar na linha 2 para a desgrudar do teto!
+                        worksheet.add_image(img, f'{col_letra_alvo}2')
+                except Exception as e:
+                    print(f"Aviso: Não foi possível inserir a imagem. Erro: {e}")
 
-                # 2. Formatação das Células de Dados
-                for row in range(2, worksheet.max_row + 1):
+                # 1. Formatação Visual de Cabeçalhos (Linha 5)
+                for cell in worksheet[5]:
+                    cell.fill = header_fill
+                    cell.font = font_branca_bold
+                    # Desativa a quebra de texto nos títulos para não cortar 'DATA PAGAMENTO'
+                    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
+                    cell.border = borda_fina # Adiciona a borda
+
+                # 2. Formatação das Células de Dados (Começam na linha 6)
+                for row in range(6, worksheet.max_row + 1):
+                    is_zebra = (row % 2 == 0)
+
                     for col_name, col_idx in col_indices.items():
                         cell = worksheet.cell(row=row, column=col_idx)
                         
-                        # Alinhamento padrão (com quebra de texto para observações/clientes)
                         cell.alignment = Alignment(vertical='center', wrap_text=True)
+                        cell.font = font_preta_bold
+                        cell.border = borda_fina # Adiciona a borda
 
-                        # Formatar a Coluna VALOR com o símbolo de Moeda (R$) e jogar para a DIREITA
+                        if col_name in ['BANCO', 'BAIXAS']:
+                            cell.fill = fill_verde_claro
+                            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
+                        else:
+                            if is_zebra:
+                                cell.fill = fill_verde_claro
+                            else:
+                                cell.fill = fill_branco
+
                         if col_name == 'VALOR':
                             cell.alignment = Alignment(horizontal='right', vertical='center', wrap_text=False)
                             if cell.value is not None:
@@ -365,50 +430,35 @@ class ExcelReporter:
                                 except:
                                     pass
 
-                        # Pintar o fundo da célula nas colunas BANCO e BAIXAS e CENTRALIZAR o texto
-                        if col_name in ['BANCO', 'BAIXAS']:
-                            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
-                            if cell.value:
-                                texto_banco = str(cell.value).upper()
-                                if 'CAIXA' in texto_banco:
-                                    cell.fill = fill_caixa
-                                    cell.font = font_branca_bold
-                                elif 'BANESE' in texto_banco:
-                                    cell.fill = fill_banese
-                                    cell.font = font_branca_bold
-                        
-                        # Aplicar Zebrado (intercalando Verde e Branco) nas colunas especificadas
-                        if col_name in colunas_zebra:
-                            # Linhas pares do Excel (2, 4, 6...) recebem o verde
-                            if row % 2 == 0:
-                                cell.fill = fill_zebra
-                                cell.font = font_branca_normal
-
                 # 3. Auto-Fit: Ajustar a largura das colunas dinamicamente
-                for col_idx in range(1, worksheet.max_column + 1):
+                for col_idx in range(1, max_col + 1):
                     max_length = 0
                     col_letter = get_column_letter(col_idx)
-                    col_name = str(worksheet.cell(row=1, column=col_idx).value).upper()
+                    col_name_val = worksheet.cell(row=5, column=col_idx).value
+                    if not col_name_val: continue
+                    col_name = str(col_name_val).upper()
                     
-                    for cell in worksheet[col_letter]:
+                    # Garantir que a coluna tenha pelo menos o tamanho do título!
+                    max_length = len(col_name)
+                    
+                    for row_idx in range(5, worksheet.max_row + 1):
+                        cell = worksheet.cell(row=row_idx, column=col_idx)
                         try:
                             if cell.value:
-                                # Analisa o tamanho do texto para auto-ajuste (separando quebras de linha)
                                 linhas = str(cell.value).split('\n')
                                 for linha in linhas:
                                     max_length = max(max_length, len(linha))
                         except:
                             pass
                     
-                    # Ajustes finos de largura
                     if col_name in ['BANCO', 'BAIXAS']:
-                        # Define largura 20 para garantir que CAIXA ECONOMICA fique numa linha única
                         worksheet.column_dimensions[col_letter].width = 20
                     elif col_name == 'VALOR':
-                        # Dá um espaço extra (+6) para garantir aquele recuo confortável no canto direito
                         worksheet.column_dimensions[col_letter].width = max(max_length + 6, 16)
+                    elif 'DATA' in col_name:
+                        # Espaço extra garantido para 'DATA PAGAMENTO' e 'DATA BAIXA'
+                        worksheet.column_dimensions[col_letter].width = max(max_length + 2, 18)
                     else:
-                        # Impede que o tamanho das outras colunas fique minúsculo ou gigante
                         worksheet.column_dimensions[col_letter].width = min(max_length + 2, 45)
 
 if __name__ == "__main__":
