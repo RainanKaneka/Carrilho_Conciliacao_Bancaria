@@ -330,49 +330,27 @@ async def conciliar(
         ExcelReporter.generate_report(relatorios, str(caminho_saida))
         logger.info("Excel gerado com sucesso.")
 
-        # ── Etapa 7: Ler o arquivo e codificar em Base64 ────────────────
-        # Lemos ANTES de retornar para que o BackgroundTask possa apagar
-        # a pasta com segurança assim que o JSON for enviado ao cliente.
-        ficheiro_bytes = caminho_saida.read_bytes()
-        ficheiro_b64 = base64.b64encode(ficheiro_bytes).decode("utf-8")
-        logger.info(
-            f"Arquivo codificado em Base64: {len(ficheiro_b64):,} caracteres. "
-            f"Enviando JSON ao cliente..."
-        )
+        # ── Etapa 7: Ler o Excel gerado para memória e converter para Base64 ──
+        with open(caminho_saida, "rb") as f:
+            excel_bytes = f.read()
+        base64_encoded = base64.b64encode(excel_bytes).decode('utf-8')
 
-        # ── Etapa 8: Montar e retornar o JSON com resultados + arquivo ──
-        # Mapeamento das chaves internas do pipeline para os nomes do JSON
-        MAPA_CHAVES = {
-            "Conciliado_Perfeito":      "perfeitos",
-            "Conciliado_Via_Historico": "historico",
-            "Conciliado_Desmembrado":   "desmembrados",
-            "Divergencias_Pendentes":   "divergencias",
+        # Extração direta e garantida das quantidades
+        qtd_perfeitos = len(relatorios.get("1_Conciliado_Perfeito", []))
+        qtd_historico = len(relatorios.get("2_Conciliado_Via_Historico", []))
+        qtd_desmembrado = len(relatorios.get("3_Conciliado_Desmembrado", []))
+        qtd_divergencias = len(relatorios.get("4_Divergencias_Pendentes", []))
+
+        # Devolve o JSON com os resultados e o ficheiro
+        return {
+            "resultados": {
+                "perfeitos": qtd_perfeitos,
+                "historico": qtd_historico,
+                "desmembrados": qtd_desmembrado,
+                "divergencias": qtd_divergencias
+            },
+            "ficheiro_base64": base64_encoded
         }
-        resultados = {
-            nome_json: len(relatorios.get(chave_pipeline, []))
-            for chave_pipeline, nome_json in MAPA_CHAVES.items()
-        }
-
-        total    = sum(resultados.values())
-        sucesso  = resultados["perfeitos"] + resultados["historico"] + resultados["desmembrados"]
-        pct      = round((sucesso / total) * 100, 1) if total > 0 else 0.0
-
-        logger.info(
-            f"Resultado final  →  Perfeitos: {resultados['perfeitos']} | "
-            f"Histórico: {resultados['historico']} | "
-            f"Desmembrados: {resultados['desmembrados']} | "
-            f"Divergências: {resultados['divergencias']} | "
-            f"Taxa: {pct}%"
-        )
-
-        return JSONResponse(
-            content={
-                "resultados": resultados,
-                "taxa_conciliacao": pct,
-                "total_registros": total,
-                "ficheiro_base64": ficheiro_b64,
-            }
-        )
 
     except HTTPException:
         # Re-lança HTTPExceptions sem modificar (já têm status e mensagem)

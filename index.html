@@ -499,27 +499,55 @@
       // Sucesso: recebe o JSON com resultados + arquivo em Base64
       const dados = await resp.json();
 
-      // Guarda os dados de resultado para preencher os KPIs
-      _resultados = dados.resultados;      // { perfeitos, historico, desmembrados, divergencias }
+      // Log de depuração — confirma o contrato do JSON recebido
+      console.log('[API] JSON recebido:', JSON.stringify({
+        resultados: dados.resultados,
+        taxa_conciliacao: dados.taxa_conciliacao,
+        total_registros: dados.total_registros,
+        ficheiro_base64_length: dados.ficheiro_base64 ? dados.ficheiro_base64.length : 0,
+      }));
 
-      // Converte a string Base64 de volta para Blob .xlsx
+      // Valida que a chave "resultados" existe no JSON
+      if (!dados.resultados) {
+        throw new Error('Resposta da API inválida: chave "resultados" ausente. Verifique o console.');
+      }
+
+      // Extrai resultados (chave aninhada, conforme contrato)
+      const res = dados.resultados;
+      _resultados = {
+        perfeitos:    Number(res.perfeitos    ?? 0),
+        historico:    Number(res.historico    ?? 0),
+        desmembrados: Number(res.desmembrados ?? 0),
+        divergencias: Number(res.divergencias ?? 0),
+      };
+
+      // Cálculo da porcentagem conforme especificação
+      const sucesso = _resultados.perfeitos + _resultados.historico + _resultados.desmembrados;
+      const totalCalcFetch = sucesso + _resultados.divergencias;
+      const percentagem = totalCalcFetch > 0
+        ? Math.round((sucesso / totalCalcFetch) * 100)
+        : 0;
+      console.log(`[API] Sucesso: ${sucesso} / Total: ${totalCalcFetch} = ${percentagem}%`);
+
+      // Converte Base64 → Blob usando Array (previne corrupção em alguns navegadores)
       const byteCharacters = atob(dados.ficheiro_base64);
-      const byteNumbers = new Uint8Array(byteCharacters.length);
+      const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
         byteNumbers[i] = byteCharacters.charCodeAt(i);
       }
+      const byteArray = new Uint8Array(byteNumbers);
       _excelBlob = new Blob(
-        [byteNumbers],
+        [byteArray],
         { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
       );
 
-      // Completa a barra
+      // Completa a barra de progresso
       bar.style.width='100%'; pctEl.textContent='100%';
       lbl.textContent='Conciliação concluída! Preparando resultados...';
       activateStep('step-1'); activateStep('step-2'); activateStep('step-3');
 
-      setTimeout(()=>{
-        _preencherResultados(_resultados, dados.taxa_conciliacao, dados.total_registros);
+      setTimeout(() => {
+        _preencherResultados(_resultados, percentagem, totalCalcFetch);
         showView('results');
       }, 600);
 
@@ -538,14 +566,16 @@
   /**
    * Preenche os KPIs de resultado com dados reais da API.
    *
-   * @param {Object} res      - { perfeitos, historico, desmembrados, divergencias }
-   * @param {number} taxaApi  - Porcentagem calculada no servidor (fallback se calc local falhar)
-   * @param {number} total    - Total de registros processados
+   * @param {Object} res        - { perfeitos, historico, desmembrados, divergencias } (já numérico)
+   * @param {number} percentagem - Porcentagem pré-calculada no fetch (Math.round inteiro)
+   * @param {number} total       - Total de registros processados
    */
-  function _preencherResultados(res, taxaApi, total) {
-    if (!res) return;
+  function _preencherResultados(res, percentagem, total) {
+    if (!res) { console.warn('[KPI] _preencherResultados chamado sem dados.'); return; }
 
-    // 1. Preenche os 4 cartões
+    console.log('[KPI] Preenchendo cartões:', res, '| Pct:', percentagem, '| Total:', total);
+
+    // 1. Preenche os 4 cartões com valores numéricos garantidos
     const mapa = [
       { campo: 'perfeitos',     id: 'kpi-perfeito'     },
       { campo: 'historico',     id: 'kpi-historico'    },
@@ -554,32 +584,33 @@
     ];
     mapa.forEach(({ campo, id }) => {
       const el = document.getElementById(id);
-      if (el) el.textContent = res[campo] ?? '—';
+      if (el) {
+        el.textContent = Number(res[campo] ?? 0);
+      } else {
+        console.warn(`[KPI] Elemento #${id} não encontrado no DOM.`);
+      }
     });
 
     // 2. Total de registros no banner
     const elTotal = document.getElementById('kpi-total');
     if (elTotal) {
-      elTotal.textContent = (total ?? 0) + ' registros processados · Planilha pronta para download';
+      elTotal.textContent = total + ' registros processados · Planilha pronta para download';
     }
 
-    // 3. Porcentagem calculada dinamicamente
+    // 3. Porcentagem pré-calculada no fetch (inteiro, sem casa decimal)
+    const pctDisplay = percentagem + '%';
+    const elTaxa = document.getElementById('kpi-taxa');
+    if (elTaxa) elTaxa.textContent = pctDisplay;
+    const elTaxaBarra = document.getElementById('kpi-taxa-barra');
+    if (elTaxaBarra) elTaxaBarra.textContent = pctDisplay;
+
+    // 4. Atualiza a barra de distribuição visual proporcional
     const perfeitos    = res.perfeitos    || 0;
     const historico    = res.historico    || 0;
     const desmembrados = res.desmembrados || 0;
     const divergencias = res.divergencias || 0;
     const totalCalc    = perfeitos + historico + desmembrados + divergencias;
-    const sucesso      = perfeitos + historico + desmembrados;
-    const pct          = totalCalc > 0
-      ? Math.round((sucesso / totalCalc) * 100 * 10) / 10   // 1 casa decimal
-      : (taxaApi ?? 0);
 
-    const elTaxa = document.getElementById('kpi-taxa');
-    if (elTaxa) elTaxa.textContent = pct.toFixed(1) + '%';
-    const elTaxaBarra = document.getElementById('kpi-taxa-barra');
-    if (elTaxaBarra) elTaxaBarra.textContent = pct.toFixed(1) + '%';
-
-    // 4. Atualiza a barra de distribuição visual proporcional
     if (totalCalc > 0) {
       const pPerf = ((perfeitos    / totalCalc) * 100).toFixed(1);
       const pHist = ((historico    / totalCalc) * 100).toFixed(1);
@@ -594,7 +625,7 @@
         bars[3].style.width = pDiv  + '%'; bars[3].title = `Divergências: ${divergencias} (${pDiv}%)`;
       }
 
-      // Atualiza as legendas — seleciona apenas os spans de texto (segundo filho de cada item)
+      // Atualiza os textos de legenda (spans de texto, não os círculos coloridos)
       const legs = document.querySelectorAll('.legenda-dist > div > span:last-child');
       if (legs.length === 4) {
         legs[0].textContent = `Perfeitos (${pPerf}%)`;
@@ -631,19 +662,20 @@
   }
 
   function triggerDownload() {
-    if(!_excelBlob) {
-      showToast('Arquivo indisponível','Execute a conciliação primeiro.','warning');
+    if (!_excelBlob) {
+      showToast('Arquivo indisponível', 'Execute a conciliação primeiro.', 'warning');
       return;
     }
-    // _excelBlob já é um Blob .xlsx construído a partir do Base64 da API
+    // Constrói o link de download a partir do Blob .xlsx (Base64 → Blob já feito no fetch)
     const url = URL.createObjectURL(_excelBlob);
     const a = document.createElement('a');
     a.href = url;
     a.download = 'Conciliacao_Final.xlsx';
     document.body.appendChild(a);
     a.click();
-    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
-    showToast('Download iniciado!','Conciliacao_Final.xlsx foi salvo com sucesso.','success');
+    document.body.removeChild(a);   // remove o elemento do DOM imediatamente
+    URL.revokeObjectURL(url);       // libera memória do Object URL
+    showToast('Download iniciado!', 'Conciliacao_Final.xlsx foi salvo com sucesso.', 'success');
   }
 
   let toastTimer=null;
