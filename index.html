@@ -61,20 +61,15 @@
 <body class="min-h-screen bg-[#F8F9FA]">
 
 <!-- HEADER -->
-<header class="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
-  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-    <div class="flex items-center gap-4">
-      <div class="w-10 h-10 rounded-xl bg-[#038201] flex items-center justify-center flex-shrink-0">
-        <span class="text-white text-[9px] font-bold text-center leading-tight select-none">CARRILHO</span>
-      </div>
-      <div class="hidden sm:block">
-        <h1 class="text-[15px] font-bold text-gray-800 leading-tight">Carrilho <span class="text-[#038201]">Distribuidora</span></h1>
-        <p class="text-[11px] text-gray-400 font-medium tracking-wide">Sistema de Conciliação Bancária</p>
-      </div>
-    </div>
-    <span class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-[#038201] text-xs font-semibold border border-green-100">
-      <i class="ph ph-shield-check text-sm"></i> v2.0 · IA Ativada
-    </span>
+<header class="sticky top-0 z-50 bg-[white] shadow-md">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center relative">
+    <!-- Logomarca (Esquerda) -->
+    <img src="./img/carrilho.png" alt="Logo Carrilho" class="h-12 w-auto object-contain" />
+
+    <!-- Título (Centralização Absoluta) -->
+    <h1 class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-green-600 font-bold text-xl tracking-wide hidden sm:block">
+      Sistema Inteligente de Conciliação
+    </h1>
   </div>
 </header>
 
@@ -83,15 +78,8 @@
   <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
     <div class="text-center sm:text-left">
       <p class="text-green-200 text-xs font-semibold uppercase tracking-widest mb-1">Automação Financeira</p>
-      <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight mb-2">Sistema Inteligente de<br class="hidden sm:block" /> Conciliação</h2>
-      <p class="text-white/70 text-sm max-w-md">Cruzamento automático entre extratos do Argos e extratos bancários com 3 regras de IA.</p>
-    </div>
-    <div class="flex gap-5 flex-shrink-0">
-      <div class="text-center"><div class="text-3xl font-extrabold">3</div><div class="text-[11px] text-white/60 font-medium uppercase tracking-wide">Regras IA</div></div>
-      <div class="w-px bg-white/20 self-stretch"></div>
-      <div class="text-center"><div class="text-3xl font-extrabold">100%</div><div class="text-[11px] text-white/60 font-medium uppercase tracking-wide">Auto</div></div>
-      <div class="w-px bg-white/20 self-stretch"></div>
-      <div class="text-center"><div class="text-3xl font-extrabold">.xlsx</div><div class="text-[11px] text-white/60 font-medium uppercase tracking-wide">Saída</div></div>
+      <h2 class="text-2xl text-white sm:text-3xl font-extrabold tracking-tight leading-tight mb-2">Sistema Inteligente de<br class="hidden sm:block" /> Conciliação Bancária</h2>
+      <p class="text-white/70 text-sm max-w-md">Cruzamento automático entre extratos do Argos e extratos bancários.</p>
     </div>
   </div>
 </section>

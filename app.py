@@ -30,6 +30,7 @@ import base64
 import sys
 from pathlib import Path
 from typing import List
+from fastapi.staticfiles import StaticFiles
 
 import pandas as pd
 import uvicorn
@@ -86,6 +87,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Avisa o FastAPI para liberar o acesso público a tudo que estiver na pasta 'img'
+app.mount("/img", StaticFiles(directory="img"), name="img")
 
 # ---------------------------------------------------------------------------
 # Servir o Front-end (index.html) como raiz do servidor
