@@ -313,30 +313,51 @@ class ReconciliationEngine:
 class ExcelReporter:
     @staticmethod
     def generate_report(data_sheets: dict, output_path: str):
+        # --- NOVO: Tratamento de Nomes das Abas e Colunas antes de exportar ---
+        formatted_sheets = {}
+        
+        # Dicionário tradutor (De -> Para)
+        mapa_colunas = {
+            'BANCO': 'BANCO',
+            'CLIENTES': 'CLIENTE',
+            'VALOR': 'VALOR DA BAIXA',
+            'DATA PAGAMENTO': 'DATA DO PAGAMENTO',
+            'BAIXAS': 'BANCO DA BAIXA',
+            'DATA BAIXA': 'DATA DA BAIXA',
+            'OBS': 'HISTÓRICO'
+        }
+        
+        for sheet_name, df in data_sheets.items():
+            # Remove os "_" dos nomes das abas (ex: "1_Conciliado_Perfeito" -> "1 Conciliado Perfeito")
+            novo_nome_aba = sheet_name.replace('_', ' ')
+            
+            if not df.empty:
+                # Aplica o dicionário tradutor para renomear as colunas
+                df = df.rename(columns=mapa_colunas)
+            
+            formatted_sheets[novo_nome_aba] = df
+
         with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-            for sheet_name, df in data_sheets.items():
+            for sheet_name, df in formatted_sheets.items():
                 if df.empty:
                     pd.DataFrame({'Aviso': ['Nenhum registo encontrado.']}).to_excel(writer, sheet_name=sheet_name, index=False)
                     continue
                 
-                # Trata as datas no formato amigável ANTES de jogar para o Excel
                 for col in df.columns:
-                    if 'data' in col.lower() or 'DATA' in col.upper():
+                    if 'DATA' in col.upper():
                         df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%d/%m/%Y').replace('NaT', '')
 
-                # Escreve a tabela começando na linha 5 (index 4) para deixar espaço para a Logomarca
                 df.to_excel(writer, sheet_name=sheet_name, index=False, startrow=4)
                 worksheet = writer.sheets[sheet_name]
 
-                # --- NOVA PALETA DE CORES INSTITUCIONAIS E FONTES ---
+                # --- PALETA DE CORES INSTITUCIONAIS E FONTES ---
                 header_fill = PatternFill(start_color='266C40', end_color='266C40', fill_type='solid')
                 fill_verde_claro = PatternFill(start_color='719C82', end_color='719C82', fill_type='solid')
                 fill_branco = PatternFill(start_color='FFFFFF', end_color='FFFFFF', fill_type='solid')
                 
                 font_branca_bold = Font(color='FFFFFF', bold=True)
-                font_preta_bold = Font(color='000000', bold=True) # Letra PRETA e NEGRITO
+                font_preta_bold = Font(color='000000', bold=True)
                 
-                # --- NOVA BORDA 356a1c ---
                 borda_fina = Border(
                     left=Side(border_style='thin', color='356A1C'),
                     right=Side(border_style='thin', color='356A1C'),
@@ -347,48 +368,39 @@ class ExcelReporter:
                 col_indices = {str(worksheet.cell(row=5, column=i).value).upper(): i for i in range(1, worksheet.max_column + 1)}
                 max_col = worksheet.max_column
 
-                # 0. Fundo verde nas 4 primeiras linhas
+                # 0. Fundo verde nas 4 primeiras linhas e Altura exata
                 for r in range(1, 5):
                     for c in range(1, max_col + 1):
                         worksheet.cell(row=r, column=c).fill = fill_verde_claro
                 
-                # --- NOVO: Definir alturas exatas para evitar que a imagem invada a tabela ---
-                worksheet.row_dimensions[1].height = 12 # Respiro superior
-                worksheet.row_dimensions[2].height = 55 # Espaço principal (comporta a imagem de 65px perfeitamente)
-                worksheet.row_dimensions[3].height = 12 # Respiro inferior
-                worksheet.row_dimensions[4].height = 12 # Margem antes do cabeçalho da tabela
+                worksheet.row_dimensions[1].height = 12
+                worksheet.row_dimensions[2].height = 55
+                worksheet.row_dimensions[3].height = 12
+                worksheet.row_dimensions[4].height = 12
 
-                # --- INSERIR LOGOMARCA CENTRALIZADA E PROPORCIONAL ---
+                # --- INSERIR LOGOMARCA ---
                 try:
                     from openpyxl.drawing.image import Image as ExcelImage
                     from PIL import Image as PILImage
                     import glob
-                    # Procura qualquer imagem dentro da pasta 'img'
                     imagens = glob.glob("img/*.*")
                     if imagens:
-                        # 1. Pega o tamanho original da imagem para não distorcer
                         pil_img = PILImage.open(imagens[0])
                         largura_original, altura_original = pil_img.size
                         
-                        # 2. Define uma altura fixa para caber com folga (65 pixels)
                         nova_altura = 65
-                        
-                        # 3. Calcula a largura proporcional para NÃO ESTICAR (Regra de 3)
                         nova_largura = int((nova_altura / altura_original) * largura_original)
                         
                         img = ExcelImage(imagens[0])
                         img.width = nova_largura
                         img.height = nova_altura
                         
-                        # 4. Centralização Visual:
                         if max_col <= 7:
-                            coluna_alvo = 4  # Coluna D (Centro exato para abas de 7 colunas)
+                            coluna_alvo = 4 
                         else:
-                            coluna_alvo = 5  # Coluna E (Centro exato para a aba de Divergências)
+                            coluna_alvo = 5 
                             
                         col_letra_alvo = get_column_letter(coluna_alvo)
-                        
-                        # 5. MUDANÇA CRUCIAL: Ancorar na linha 2 para a desgrudar do teto!
                         worksheet.add_image(img, f'{col_letra_alvo}2')
                 except Exception as e:
                     print(f"Aviso: Não foi possível inserir a imagem. Erro: {e}")
@@ -397,9 +409,9 @@ class ExcelReporter:
                 for cell in worksheet[5]:
                     cell.fill = header_fill
                     cell.font = font_branca_bold
-                    # Desativa a quebra de texto nos títulos para não cortar 'DATA PAGAMENTO'
+                    # GARANTIA: Sem quebra de linha nos títulos (wrap_text=False)
                     cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
-                    cell.border = borda_fina # Adiciona a borda
+                    cell.border = borda_fina
 
                 # 2. Formatação das Células de Dados (Começam na linha 6)
                 for row in range(6, worksheet.max_row + 1):
@@ -410,9 +422,10 @@ class ExcelReporter:
                         
                         cell.alignment = Alignment(vertical='center', wrap_text=True)
                         cell.font = font_preta_bold
-                        cell.border = borda_fina # Adiciona a borda
+                        cell.border = borda_fina
 
-                        if col_name in ['BANCO', 'BAIXAS']:
+                        # Atualizamos as referências para os NOVOS nomes das colunas!
+                        if col_name in ['BANCO', 'BANCO DA BAIXA']:
                             cell.fill = fill_verde_claro
                             cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
                         else:
@@ -421,7 +434,7 @@ class ExcelReporter:
                             else:
                                 cell.fill = fill_branco
 
-                        if col_name == 'VALOR':
+                        if col_name == 'VALOR DA BAIXA':
                             cell.alignment = Alignment(horizontal='right', vertical='center', wrap_text=False)
                             if cell.value is not None:
                                 try:
@@ -438,8 +451,8 @@ class ExcelReporter:
                     if not col_name_val: continue
                     col_name = str(col_name_val).upper()
                     
-                    # Garantir que a coluna tenha pelo menos o tamanho do título!
-                    max_length = len(col_name)
+                    # Garante um respiro largo para os títulos (evitando a quebra de linha)
+                    max_length = len(col_name) + 3 
                     
                     for row_idx in range(5, worksheet.max_row + 1):
                         cell = worksheet.cell(row=row_idx, column=col_idx)
@@ -451,15 +464,15 @@ class ExcelReporter:
                         except:
                             pass
                     
-                    if col_name in ['BANCO', 'BAIXAS']:
-                        worksheet.column_dimensions[col_letter].width = 20
-                    elif col_name == 'VALOR':
-                        worksheet.column_dimensions[col_letter].width = max(max_length + 6, 16)
+                    # Definimos larguras mínimas baseadas nos novos textos
+                    if col_name in ['BANCO', 'BANCO DA BAIXA']:
+                        worksheet.column_dimensions[col_letter].width = max(max_length, 20)
+                    elif col_name == 'VALOR DA BAIXA':
+                        worksheet.column_dimensions[col_letter].width = max(max_length + 6, 20)
                     elif 'DATA' in col_name:
-                        # Espaço extra garantido para 'DATA PAGAMENTO' e 'DATA BAIXA'
-                        worksheet.column_dimensions[col_letter].width = max(max_length + 2, 18)
+                        worksheet.column_dimensions[col_letter].width = max(max_length + 2, 23)
                     else:
-                        worksheet.column_dimensions[col_letter].width = min(max_length + 2, 45)
+                        worksheet.column_dimensions[col_letter].width = min(max_length + 2, 50)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Conciliacao Bancaria Global")
