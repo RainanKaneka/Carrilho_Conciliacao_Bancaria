@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://unpkg.com/@phosphor-icons/web@2.1.1/src/index.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -74,16 +75,15 @@
   </div>
 </header>
 
-<!-- HERO -->
-<!-- <section class="bg-gradient-to-br from-[#038201] via-[#026901] to-[#025501] text-white py-10 px-4">
-  <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
-    <div class="text-center sm:text-left">
-      <p class="text-green-200 text-xs font-semibold uppercase tracking-widest mb-1">Automação Financeira</p>
-      <h2 class="text-2xl text-white sm:text-3xl font-extrabold tracking-tight leading-tight mb-2">Sistema Inteligente de<br class="hidden sm:block" /> Conciliação Bancária</h2>
-      <p class="text-white/70 text-sm max-w-md">Cruzamento automático entre extratos do Argos e extratos bancários.</p>
-    </div>  
+<!-- NAV TABS -->
+<nav class="bg-white border-b border-gray-200">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex space-x-8">
+      <button onclick="switchTab('nova')" id="tab-nova" class="border-b-2 border-[#038201] text-[#038201] py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none">Nova Conciliação</button>
+      <button onclick="switchTab('historico')" id="tab-historico" class="border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none">Histórico & Analytics</button>
+    </div>
   </div>
-</section> -->
+</nav>
 
 <!-- MAIN -->
 <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -235,7 +235,7 @@
   <!-- VIEW: RESULTS -->
   <div id="view-results" class="hidden">
     <!-- Banner -->
-    <div class="flex items-center gap-3 bg-green-50 border border-green-100 rounded-2xl px-5 py-4 mb-8">
+    <div class="flex items-center gap-3 bg-green-50 border border-green-100 rounded-2xl px-5 py-4 mb-4">
       <div class="w-10 h-10 rounded-xl bg-[#038201] flex items-center justify-center flex-shrink-0">
         <i class="ph ph-check-fat text-white text-xl"></i>
       </div>
@@ -246,6 +246,33 @@
       <div class="ml-auto text-right hidden sm:block">
         <p class="text-green-600 text-xs font-medium">Taxa de Conciliação</p>
         <p id="kpi-taxa" class="text-green-800 font-bold text-sm">—</p>
+      </div>
+    </div>
+
+    <!-- Inline Edit Period -->
+    <div class="flex items-center justify-between bg-white border border-gray-100 rounded-2xl px-5 py-3 mb-8 shadow-sm">
+      <div class="flex items-center gap-2">
+        <i class="ph ph-calendar text-gray-400 text-lg"></i>
+        <p class="text-sm text-gray-500 font-medium">Período Processado:</p>
+      </div>
+      
+      <!-- Static View -->
+      <div id="periodo-view" class="flex items-center gap-2">
+        <span id="periodo-text" class="text-sm font-bold text-gray-800">Desconhecido</span>
+        <button onclick="toggleEditPeriodo()" class="text-gray-400 hover:text-[#038201] transition-colors" title="Editar Período">
+          <i class="ph ph-pencil-simple text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Edit View -->
+      <div id="periodo-edit" class="hidden flex items-center gap-2">
+        <input type="text" id="periodo-input" class="text-sm font-bold text-gray-800 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-[#038201] w-32 text-center" />
+        <button onclick="salvarPeriodo()" class="text-green-600 hover:text-green-700 transition-colors" title="Salvar">
+          <i class="ph ph-check-circle text-lg"></i>
+        </button>
+        <button onclick="toggleEditPeriodo()" class="text-red-500 hover:text-red-600 transition-colors" title="Cancelar">
+          <i class="ph ph-x-circle text-lg"></i>
+        </button>
       </div>
     </div>
 
@@ -310,6 +337,58 @@
         <i class="ph ph-arrow-counter-clockwise text-lg"></i>
         Fazer Nova Conciliação
       </button>
+    </div>
+  </div>
+
+  <!-- VIEW: HISTORICO -->
+  <div id="view-historico" class="hidden animate-[fadeIn_0.4s_ease-out_both]">
+    <div class="mb-8">
+      <h3 class="text-xl font-bold text-gray-800 mb-1">Histórico & Analytics</h3>
+      <p class="text-gray-400 text-sm">Acompanhe a evolução da sua conciliação ao longo do tempo</p>
+    </div>
+
+    <!-- Charts -->
+    <div id="charts-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-100">
+        <h4 class="font-bold text-gray-800 text-sm mb-4">Evolução da Taxa de Sucesso (%)</h4>
+        <div class="relative h-64">
+          <canvas id="chart-taxa"></canvas>
+        </div>
+      </div>
+      <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-100">
+        <h4 class="font-bold text-gray-800 text-sm mb-4">Sucesso vs Divergências (Qtd)</h4>
+        <div class="relative h-64">
+          <canvas id="chart-barras"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="historico-empty" class="bg-white rounded-2xl shadow-card p-12 border border-gray-100 text-center mb-8 hidden">
+      <i class="ph ph-chart-line-up text-5xl text-gray-300 mb-4 inline-block"></i>
+      <h4 class="text-lg font-bold text-gray-700 mb-2">Nenhum histórico disponível</h4>
+      <p class="text-gray-400 text-sm max-w-sm mx-auto">Faça uma nova conciliação para ver as estatísticas aparecerem aqui.</p>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-2xl shadow-card border border-gray-100 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-gray-50 border-b border-gray-100">
+              <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Data de Processamento</th>
+              <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Período</th>
+              <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Conciliados</th>
+              <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Divergências</th>
+              <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Taxa de Sucesso</th>
+              <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-historico" class="divide-y divide-gray-100 text-sm">
+            <tr><td colspan="6" class="py-8 text-center text-gray-400">Carregando histórico...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -431,6 +510,8 @@
   // Armazena o Blob do Excel retornado pela API para o botão de download
   let _excelBlob = null;
   let _resultados = null;
+  let _currentId = null;
+  let _currentPeriodo = '';
 
   async function startReconciliation() {
     showView('loading');
@@ -487,6 +568,8 @@
 
       // Sucesso: recebe o JSON com resultados + arquivo em Base64
       const dados = await resp.json();
+      _currentId = dados.id_historico;
+      _currentPeriodo = dados.periodo;
 
       // Log de depuração — confirma o contrato do JSON recebido
       console.log('[API] JSON recebido:', JSON.stringify({
@@ -537,6 +620,7 @@
 
       setTimeout(() => {
         _preencherResultados(_resultados, percentagem, totalCalcFetch);
+        document.getElementById('periodo-text').textContent = _currentPeriodo || 'Desconhecido';
         showView('results');
       }, 600);
 
@@ -631,13 +715,18 @@
   }
 
   function showView(view) {
-    ['upload','loading','results'].forEach(v=>{
-      document.getElementById('view-'+v).classList[v===view?'remove':'add']('hidden');
+    ['upload','loading','results','historico'].forEach(v=>{
+      const el = document.getElementById('view-'+v);
+      if (el) el.classList[v===view?'remove':'add']('hidden');
     });
   }
 
-  function resetApp() {
+  function resetApp(silent = false) {
     state.argos=[]; state.bank=[];
+    _excelBlob = null;
+    _resultados = null;
+    _currentId = null;
+    _currentPeriodo = '';
     renderFileList('argos'); renderFileList('bank'); updateButton();
     document.getElementById('progress-bar').style.width='0%';
     document.getElementById('progress-pct').textContent='0%';
@@ -647,12 +736,17 @@
       el.classList.add('opacity-40'); el.classList.remove('opacity-100','border-green-200','bg-green-50');
     });
     showView('upload');
-    showToast('Pronto!','Os campos foram limpos com sucesso.','info');
+    if(silent !== true) showToast('Pronto!','Os campos foram limpos com sucesso.','info');
   }
 
   function triggerDownload() {
     if (!_excelBlob) {
-      showToast('Arquivo indisponível', 'Execute a conciliação primeiro.', 'warning');
+      if (_currentId) {
+        window.location.href = API_BASE + '/api/download/' + _currentId;
+        showToast('Download iniciado!', 'Baixando planilha do histórico.', 'success');
+      } else {
+        showToast('Arquivo indisponível', 'Execute a conciliação primeiro.', 'warning');
+      }
       return;
     }
     // Constrói o link de download a partir do Blob .xlsx (Base64 → Blob já feito no fetch)
@@ -686,6 +780,257 @@
   function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
 
   updateButton();
+
+  // ----- FUNCIONALIDADE DAS ABAS E HISTÓRICO -----
+  let chartTaxaInstance = null;
+  let chartBarrasInstance = null;
+
+  async function switchTab(tab) {
+    const isNova = tab === 'nova';
+    document.getElementById('tab-nova').className = isNova 
+      ? 'border-b-2 border-[#038201] text-[#038201] py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none'
+      : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none';
+    
+    document.getElementById('tab-historico').className = !isNova 
+      ? 'border-b-2 border-[#038201] text-[#038201] py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none'
+      : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none';
+
+    if (isNova) {
+      resetApp(true);
+    } else {
+      showView('historico');
+      await fetchHistorico();
+    }
+  }
+
+  async function fetchHistorico() {
+    try {
+      const resp = await fetch(API_BASE + '/api/historico');
+      if (!resp.ok) throw new Error('Falha ao carregar histórico.');
+      const data = await resp.json();
+      renderHistorico(data);
+    } catch(err) {
+      console.error(err);
+      showToast('Erro', 'Não foi possível carregar o histórico.', 'error');
+    }
+  }
+
+  function renderHistorico(data) {
+    const tbody = document.getElementById('tabela-historico');
+    const chartsContainer = document.getElementById('charts-container');
+    const emptyState = document.getElementById('historico-empty');
+
+    if (!data || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-gray-400">Nenhum histórico encontrado.</td></tr>';
+      if (chartsContainer) chartsContainer.classList.add('hidden');
+      if (emptyState) emptyState.classList.remove('hidden');
+      return;
+    }
+
+    if (chartsContainer) chartsContainer.classList.remove('hidden');
+    if (emptyState) emptyState.classList.add('hidden');
+
+    // Popula a tabela
+    tbody.innerHTML = data.map(row => {
+      const d = new Date(row.data_processamento);
+      const dataFormatada = d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+      const conciliados = row.perfeitos + row.historico + row.desmembrados;
+      const sucesso = (row.taxa_sucesso || 0).toFixed(1);
+      return `
+        <tr class="hover:bg-gray-50 transition-colors">
+          <td class="py-4 px-6 text-gray-800 font-medium whitespace-nowrap">${dataFormatada}</td>
+          <td class="py-4 px-6 text-gray-500 text-xs font-medium whitespace-nowrap">
+            <div id="td-periodo-view-${row.id}" class="flex items-center gap-2">
+              <span id="td-periodo-text-${row.id}">${row.periodo || 'Desconhecido'}</span>
+              <button onclick="toggleRowEdit(${row.id}, '${esc(row.periodo || '')}')" class="text-gray-400 hover:text-[#038201] transition-colors" title="Editar Período">
+                <i class="ph ph-pencil-simple text-sm"></i>
+              </button>
+            </div>
+            <div id="td-periodo-edit-${row.id}" class="hidden flex items-center gap-2">
+              <input type="text" id="td-periodo-input-${row.id}" class="text-xs font-bold text-gray-800 border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#038201] w-24 text-center" />
+              <button onclick="salvarRowPeriodo(${row.id})" class="text-green-600 hover:text-green-700 transition-colors" title="Salvar">
+                <i class="ph ph-check-circle text-lg"></i>
+              </button>
+              <button onclick="toggleRowEdit(${row.id})" class="text-red-500 hover:text-red-600 transition-colors" title="Cancelar">
+                <i class="ph ph-x-circle text-lg"></i>
+              </button>
+            </div>
+          </td>
+          <td class="py-4 px-6 text-center text-[#038201] font-semibold">${conciliados}</td>
+          <td class="py-4 px-6 text-center text-amber-500 font-semibold">${row.divergencias}</td>
+          <td class="py-4 px-6 text-center">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${row.taxa_sucesso >= 80 ? 'bg-green-50 text-[#038201]' : 'bg-amber-50 text-amber-600'} text-xs font-bold">
+              ${sucesso}%
+            </span>
+          </td>
+          <td class="py-4 px-6 text-right">
+            <div class="flex items-center justify-end gap-2">
+              <button onclick="visualizarHistorico(${row.id}, ${row.perfeitos}, ${row.historico}, ${row.desmembrados}, ${row.divergencias}, ${row.taxa_sucesso}, '${esc(row.periodo || '')}')" class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all shadow-sm group" title="Visualizar Detalhes">
+                <i class="ph ph-eye text-lg transition-transform group-hover:-translate-y-0.5"></i>
+              </button>
+              <a href="${API_BASE}/api/download/${row.id}" download class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-green-50 text-[#038201] hover:bg-[#038201] hover:text-white transition-all shadow-sm group" title="Baixar Arquivo Morto">
+                <i class="ph ph-download-simple text-lg transition-transform group-hover:-translate-y-0.5"></i>
+              </a>
+              <button onclick="excluirHistorico(${row.id})" class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-sm group" title="Excluir Histórico">
+                <i class="ph ph-trash text-lg transition-transform group-hover:-translate-y-0.5"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    // Prepara dados para os gráficos (últimos 10 registros cronológicos)
+    const ultimos = data.slice(0, 10).reverse();
+    const labels = ultimos.map(r => r.periodo || 'Desconhecido');
+    const taxas = ultimos.map(r => r.taxa_sucesso || 0);
+    const conciliaArr = ultimos.map(r => r.perfeitos + r.historico + r.desmembrados);
+    const divArr = ultimos.map(r => r.divergencias);
+
+    // Gráfico 1: Linha
+    const ctxTaxa = document.getElementById('chart-taxa').getContext('2d');
+    if (chartTaxaInstance) chartTaxaInstance.destroy();
+    chartTaxaInstance = new Chart(ctxTaxa, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Taxa de Sucesso (%)', data: taxas,
+          borderColor: '#038201', backgroundColor: 'rgba(3,130,1,0.1)',
+          fill: true, tension: 0.4, borderWidth: 3,
+          pointBackgroundColor: '#038201', pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100 } } }
+    });
+
+    // Gráfico 2: Barras Empilhadas
+    const ctxBarras = document.getElementById('chart-barras').getContext('2d');
+    if (chartBarrasInstance) chartBarrasInstance.destroy();
+    chartBarrasInstance = new Chart(ctxBarras, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Conciliados', data: conciliaArr, backgroundColor: '#038201', borderRadius: 4 },
+          { label: 'Divergências', data: divArr, backgroundColor: '#f59e0b', borderRadius: 4 }
+        ]
+      },
+      options: { 
+        responsive: true, maintainAspectRatio: false, 
+        plugins: { legend: { position: 'bottom' } }, 
+        scales: { x: { stacked: true }, y: { stacked: true } } 
+      }
+    });
+  }
+
+  async function excluirHistorico(id) {
+    if (!confirm('Tem certeza que deseja excluir o histórico desta conciliação?')) return;
+    try {
+      const resp = await fetch(API_BASE + '/api/historico/' + id, { method: 'DELETE' });
+      if (!resp.ok) throw new Error('Falha ao excluir histórico.');
+      showToast('Sucesso', 'Histórico e arquivo excluídos com sucesso.', 'success');
+      fetchHistorico(); // recarrega a tabela e os gráficos
+    } catch(err) {
+      console.error(err);
+      showToast('Erro', 'Não foi possível excluir o histórico.', 'error');
+    }
+  }
+
+  function toggleEditPeriodo() {
+    const view = document.getElementById('periodo-view');
+    const edit = document.getElementById('periodo-edit');
+    if (view.classList.contains('hidden')) {
+      view.classList.remove('hidden');
+      edit.classList.add('hidden');
+    } else {
+      view.classList.add('hidden');
+      edit.classList.remove('hidden');
+      document.getElementById('periodo-input').value = _currentPeriodo;
+    }
+  }
+
+  async function salvarPeriodo() {
+    const input = document.getElementById('periodo-input');
+    const novoValor = input.value.trim();
+    if (!novoValor) return;
+    
+    if (!_currentId) {
+      showToast('Erro', 'Nenhuma conciliação ativa para editar.', 'error');
+      return;
+    }
+
+    try {
+      const resp = await fetch(API_BASE + '/api/historico/' + _currentId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ periodo: novoValor })
+      });
+      if (!resp.ok) throw new Error('Falha ao atualizar período.');
+      
+      _currentPeriodo = novoValor;
+      document.getElementById('periodo-text').textContent = novoValor;
+      toggleEditPeriodo();
+      showToast('Sucesso', 'Período atualizado com sucesso.', 'success');
+    } catch(err) {
+      console.error(err);
+      showToast('Erro', 'Não foi possível atualizar o período.', 'error');
+    }
+  }
+
+  function visualizarHistorico(id, perfeitos, historico, desmembrados, divergencias, taxa_sucesso, periodo) {
+    _currentId = id;
+    _currentPeriodo = periodo || 'Desconhecido';
+    _resultados = {
+       perfeitos: perfeitos,
+       historico: historico,
+       desmembrados: desmembrados,
+       divergencias: divergencias
+    };
+    _excelBlob = null; 
+    
+    document.getElementById('periodo-text').textContent = _currentPeriodo;
+    const totalCalc = perfeitos + historico + desmembrados + divergencias;
+    _preencherResultados(_resultados, taxa_sucesso, totalCalc);
+    
+    document.getElementById('tab-nova').className = 'border-b-2 border-[#038201] text-[#038201] py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none';
+    document.getElementById('tab-historico').className = 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none';
+    showView('results');
+  }
+
+  function toggleRowEdit(id, currentValue = '') {
+    const view = document.getElementById('td-periodo-view-' + id);
+    const edit = document.getElementById('td-periodo-edit-' + id);
+    if (view.classList.contains('hidden')) {
+      view.classList.remove('hidden');
+      edit.classList.add('hidden');
+    } else {
+      view.classList.add('hidden');
+      edit.classList.remove('hidden');
+      document.getElementById('td-periodo-input-' + id).value = currentValue;
+    }
+  }
+
+  async function salvarRowPeriodo(id) {
+    const input = document.getElementById('td-periodo-input-' + id);
+    const novoValor = input.value.trim();
+    if (!novoValor) return;
+
+    try {
+      const resp = await fetch(API_BASE + '/api/historico/' + id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ periodo: novoValor })
+      });
+      if (!resp.ok) throw new Error('Falha ao atualizar período na tabela.');
+      
+      showToast('Sucesso', 'Período atualizado na tabela.', 'success');
+      fetchHistorico();
+    } catch(err) {
+      console.error(err);
+      showToast('Erro', 'Não foi possível atualizar o período.', 'error');
+    }
+  }
 </script>
 </body>
 </html>

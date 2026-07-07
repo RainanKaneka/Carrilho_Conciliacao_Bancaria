@@ -40,6 +40,10 @@ from fastapi import FastAPI, File, Form, UploadFile, BackgroundTasks, HTTPExcept
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+class PeriodoUpdate(BaseModel):
+    periodo: str
 
 # ---------------------------------------------------------------------------
 # Importação do motor de conciliação (mesmo diretório)
@@ -87,6 +91,13 @@ def init_db():
                 caminho_arquivo TEXT
             )
         """)
+        
+        # Migração: adicionar coluna periodo se não existir
+        try:
+            cursor.execute("ALTER TABLE conciliacoes ADD COLUMN periodo TEXT DEFAULT 'Desconhecido'")
+        except sqlite3.OperationalError:
+            pass # A coluna já existe
+            
         conn.commit()
 
 init_db()
@@ -381,14 +392,35 @@ async def conciliar(
         total = sucesso + qtd_divergencias
         taxa_sucesso = (sucesso / total * 100) if total > 0 else 0.0
 
+        # Lógica blindada para extração do Período
+        periodo_str = "Desconhecido"
+        try:
+            datas_todas = []
+            if not df_argos_full.empty and 'Data' in df_argos_full.columns:
+                datas_todas.extend(df_argos_full['Data'].dropna().tolist())
+            if not df_banco_full.empty and 'Data' in df_banco_full.columns:
+                datas_todas.extend(df_banco_full['Data'].dropna().tolist())
+            
+            if datas_todas:
+                # Converte a lista de strings para datetime de forma segura
+                datas_dt = pd.to_datetime(datas_todas, format='%d/%m/%Y', errors='coerce')
+                datas_dt = datas_dt.dropna()
+                if not datas_dt.empty:
+                    data_min = datas_dt.min().strftime('%d/%m') # Ex: 16/06
+                    data_max = datas_dt.max().strftime('%d/%m') # Ex: 30/06
+                    periodo_str = f"{data_min} a {data_max}"
+        except Exception as e:
+            print(f"Aviso: Erro ao extrair período: {e}")
+
         # Gravar histórico no Banco de Dados
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO conciliacoes 
-                (data_processamento, perfeitos, historico, desmembrados, divergencias, taxa_sucesso, caminho_arquivo)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (datetime.now(), qtd_perfeitos, qtd_historico, qtd_desmembrado, qtd_divergencias, taxa_sucesso, str(caminho_saida)))
+                (data_processamento, perfeitos, historico, desmembrados, divergencias, taxa_sucesso, caminho_arquivo, periodo)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (datetime.now(), qtd_perfeitos, qtd_historico, qtd_desmembrado, qtd_divergencias, taxa_sucesso, str(caminho_saida), periodo_str))
+            novo_id = cursor.lastrowid
             conn.commit()
 
         # Devolve o JSON com os resultados e o ficheiro
@@ -399,7 +431,9 @@ async def conciliar(
                 "desmembrados": qtd_desmembrado,
                 "divergencias": qtd_divergencias
             },
-            "ficheiro_base64": base64_encoded
+            "ficheiro_base64": base64_encoded,
+            "id_historico": novo_id,
+            "periodo": periodo_str
         }
 
     except HTTPException:
@@ -499,6 +533,57 @@ async def baixar_arquivo_antigo(id: int):
     except Exception as exc:
         logger.error(f"Erro ao baixar arquivo {id}: {exc}")
         raise HTTPException(status_code=500, detail="Erro interno ao processar o download.")
+
+@app.delete("/api/historico/{id}", tags=["Histórico"])
+async def excluir_historico(id: int):
+    """
+    Exclui o histórico de conciliação do banco de dados e apaga o arquivo físico.
+    """
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT caminho_arquivo FROM conciliacoes WHERE id = ?", (id,))
+            linha = cursor.fetchone()
+            
+            if not linha:
+                raise HTTPException(status_code=404, detail="Conciliação não encontrada.")
+            
+            caminho_arquivo = Path(linha[0])
+            if caminho_arquivo.exists():
+                try:
+                    os.remove(caminho_arquivo)
+                    logger.info(f"Arquivo físico removido: {caminho_arquivo.name}")
+                except OSError as exc:
+                    logger.warning(f"Não foi possível remover o arquivo {caminho_arquivo.name}: {exc}")
+            
+            cursor.execute("DELETE FROM conciliacoes WHERE id = ?", (id,))
+            conn.commit()
+            
+            return JSONResponse(content={"status": "success", "message": "Histórico excluído com sucesso."})
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Erro ao excluir histórico {id}: {exc}")
+        raise HTTPException(status_code=500, detail="Erro interno ao excluir histórico.")
+
+@app.put("/api/historico/{id}", tags=["Histórico"])
+async def editar_historico(id: int, payload: PeriodoUpdate):
+    """
+    Edita o período de uma conciliação já gravada.
+    """
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE conciliacoes SET periodo = ? WHERE id = ?", (payload.periodo, id))
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Conciliação não encontrada.")
+            conn.commit()
+            return JSONResponse(content={"status": "success", "message": "Período atualizado."})
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Erro ao editar histórico {id}: {exc}")
+        raise HTTPException(status_code=500, detail="Erro interno ao tentar atualizar o histórico.")
 
 # ---------------------------------------------------------------------------
 # Endpoint de Health Check
