@@ -209,18 +209,6 @@ class ReconciliationEngine:
                         if achou: break
                 if achou: break
             
-            if not achou:
-                candidatos_list = list(candidatos_argos['Valor'].to_dict().items())
-                for r in range(2, 4):
-                    if r == 3 and len(candidatos_list) > 60:
-                        continue
-                    for comb in itertools.combinations(candidatos_list, r):
-                        soma = sum(item[1] for item in comb)
-                        if round(soma, 2) == round(v_banco, 2):
-                            achou = [item[0] for item in comb]
-                            break
-                    if achou: break
-
             if achou:
                 self.df_bank.at[idx_b, 'status'] = 'conciliado'
                 for idx_a in achou:

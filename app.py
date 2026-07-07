@@ -28,6 +28,8 @@ import shutil
 import logging
 import base64
 import sys
+import sqlite3
+from datetime import datetime
 from pathlib import Path
 from typing import List
 from fastapi.staticfiles import StaticFiles
@@ -62,6 +64,32 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Configuração do Banco de Dados SQLite (Memória do Sistema)
+# ---------------------------------------------------------------------------
+DB_PATH = Path(__file__).parent / "historico.db"
+ARQUIVOS_ANTIGOS_DIR = Path(__file__).parent / "arquivos_antigos"
+ARQUIVOS_ANTIGOS_DIR.mkdir(parents=True, exist_ok=True)
+
+def init_db():
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS conciliacoes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                data_processamento DATETIME,
+                perfeitos INTEGER,
+                historico INTEGER,
+                desmembrados INTEGER,
+                divergencias INTEGER,
+                taxa_sucesso REAL,
+                caminho_arquivo TEXT
+            )
+        """)
+        conn.commit()
+
+init_db()
 
 # ---------------------------------------------------------------------------
 # Instância do Aplicativo FastAPI
@@ -328,11 +356,14 @@ async def conciliar(
         for chave, df_resultado in relatorios.items():
             logger.info(f"  {chave}: {len(df_resultado)} registro(s)")
 
-        # ── Etapa 6: Gerar arquivo Excel de saída ───────────────────────
-        caminho_saida = pasta_temp / "conciliacao_pronta.xlsx"
+        # ── Etapa 6: Gerar arquivo Excel de saída e salvar no Arquivo Morto ──
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        nome_arquivo = f"Conciliacao_{timestamp}.xlsx"
+        caminho_saida = ARQUIVOS_ANTIGOS_DIR / nome_arquivo
+
         logger.info(f"Gerando Excel em: {caminho_saida.name}...")
         ExcelReporter.generate_report(relatorios, str(caminho_saida))
-        logger.info("Excel gerado com sucesso.")
+        logger.info("Excel gerado e salvo no Arquivo Morto com sucesso.")
 
         # ── Etapa 7: Ler o Excel gerado para memória e converter para Base64 ──
         with open(caminho_saida, "rb") as f:
@@ -344,6 +375,21 @@ async def conciliar(
         qtd_historico = len(relatorios.get("2_Conciliado_Via_Historico", []))
         qtd_desmembrado = len(relatorios.get("3_Conciliado_Desmembrado", []))
         qtd_divergencias = len(relatorios.get("4_Divergencias_Pendentes", []))
+
+        # Cálculo da Taxa de Sucesso
+        sucesso = qtd_perfeitos + qtd_historico + qtd_desmembrado
+        total = sucesso + qtd_divergencias
+        taxa_sucesso = (sucesso / total * 100) if total > 0 else 0.0
+
+        # Gravar histórico no Banco de Dados
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO conciliacoes 
+                (data_processamento, perfeitos, historico, desmembrados, divergencias, taxa_sucesso, caminho_arquivo)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (datetime.now(), qtd_perfeitos, qtd_historico, qtd_desmembrado, qtd_divergencias, taxa_sucesso, str(caminho_saida)))
+            conn.commit()
 
         # Devolve o JSON com os resultados e o ficheiro
         return {
@@ -401,6 +447,58 @@ async def conciliar(
             ),
         ) from exc
 
+
+# ---------------------------------------------------------------------------
+# Endpoints de Histórico e Arquivo Morto
+# ---------------------------------------------------------------------------
+
+@app.get("/api/historico", tags=["Histórico"])
+async def obter_historico() -> JSONResponse:
+    """
+    Retorna a lista de todas as conciliações executadas no passado,
+    ordenada da mais recente para a mais antiga.
+    """
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM conciliacoes ORDER BY data_processamento DESC")
+            linhas = cursor.fetchall()
+            
+            resultados = [dict(linha) for linha in linhas]
+            return JSONResponse(content=resultados)
+    except Exception as exc:
+        logger.error(f"Erro ao buscar histórico: {exc}")
+        raise HTTPException(status_code=500, detail="Erro ao ler o histórico do banco de dados.")
+
+@app.get("/api/download/{id}", tags=["Histórico"])
+async def baixar_arquivo_antigo(id: int):
+    """
+    Baixa um arquivo de conciliação do Arquivo Morto pelo seu ID.
+    """
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT caminho_arquivo FROM conciliacoes WHERE id = ?", (id,))
+            linha = cursor.fetchone()
+            
+            if not linha:
+                raise HTTPException(status_code=404, detail="Conciliação não encontrada.")
+            
+            caminho_arquivo = Path(linha[0])
+            if not caminho_arquivo.exists():
+                raise HTTPException(status_code=404, detail="Arquivo Excel não encontrado no disco.")
+                
+            return FileResponse(
+                path=caminho_arquivo,
+                filename=caminho_arquivo.name,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Erro ao baixar arquivo {id}: {exc}")
+        raise HTTPException(status_code=500, detail="Erro interno ao processar o download.")
 
 # ---------------------------------------------------------------------------
 # Endpoint de Health Check
