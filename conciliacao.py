@@ -1,334 +1,478 @@
-import pandas as pd
-import re
-import os
-from datetime import timedelta
-import itertools
 import argparse
 import warnings
-
-# Bibliotecas para pintar e formatar o Excel (Bordas adicionadas!)
+import pandas as pd
+import re
+import itertools
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 warnings.filterwarnings('ignore')
 
+def parse_currency(val):
+    """Função blindada para converter qualquer formato de dinheiro para número"""
+    if pd.isna(val): return None
+    if isinstance(val, (int, float)): return float(val)
+    val = str(val).upper().replace('R$', '').strip()
+    if '.' in val and ',' in val:
+        val = val.replace('.', '').replace(',', '.')
+    elif ',' in val:
+        val = val.replace(',', '.')
+    try:
+        return float(val)
+    except:
+        return None
+
+
 class DataCleaner:
     @staticmethod
-    def clean_argos(filepath: str) -> pd.DataFrame:
-        df = pd.read_excel(filepath, header=None)
-        header_idx = df[df.apply(lambda row: row.astype(str).str.contains('Parceiro Descrição', case=False).any(), axis=1)].index
-        if len(header_idx) > 0:
-            df.columns = df.iloc[header_idx[0]]
-            df = df.iloc[header_idx[0]+1:].reset_index(drop=True)
-        else:
-            raise ValueError(f"Não foi possível encontrar a tabela principal no ficheiro do Argos: {os.path.basename(filepath)}")
+    def clean_argos(file_path: str) -> pd.DataFrame:
+        try:
+            import pandas as pd
+            df = pd.read_excel(file_path, engine='openpyxl')
+            
+            header_idx = None
+            for idx, row in df.iterrows():
+                row_str = ' '.join(str(val).lower() for val in row.values)
+                if 'valor' in row_str and ('cliente' in row_str or 'parceiro' in row_str):
+                    header_idx = idx
+                    break
+            
+            if header_idx is not None:
+                df = pd.read_excel(file_path, header=header_idx + 1, engine='openpyxl')
+            
+            col_mapping = {}
+            for col in df.columns:
+                col_lower = str(col).lower()
+                if 'banco' in col_lower and 'baixa' not in col_lower and 'Banco' not in col_mapping.values(): 
+                    col_mapping[col] = 'Banco'
+                elif ('cliente' in col_lower or 'parceiro' in col_lower) and 'Cliente' not in col_mapping.values(): 
+                    col_mapping[col] = 'Cliente'
+                elif 'valor' in col_lower and 'Valor' not in col_mapping.values(): 
+                    col_mapping[col] = 'Valor'
+                elif 'data' in col_lower and 'baixa' not in col_lower and 'Data' not in col_mapping.values(): 
+                    col_mapping[col] = 'Data'
+                elif ('obs' in col_lower or 'hist' in col_lower) and 'Histórico' not in col_mapping.values(): 
+                    col_mapping[col] = 'Histórico'
+            
+            df = df.rename(columns=col_mapping)
+            df = df.loc[:, ~df.columns.duplicated()].copy()
+            cols_to_keep = [c for c in ['Banco', 'Cliente', 'Valor', 'Data', 'Histórico'] if c in df.columns]
+            df = df[cols_to_keep]
+            
+            if 'Valor' not in df.columns: return pd.DataFrame()
+            if 'Data' not in df.columns: df['Data'] = ''
+            if 'Histórico' not in df.columns: df['Histórico'] = ''
+            if 'Cliente' not in df.columns: df['Cliente'] = 'CLIENTE NÃO INFORMADO'
+            
+            df = df.dropna(subset=['Valor'])
+            
+            def parse_currency(val):
+                if pd.isna(val): return None
+                if isinstance(val, (int, float)): return float(val)
+                val = str(val).upper().replace('R$', '').strip()
+                if '.' in val and ',' in val:
+                    val = val.replace('.', '').replace(',', '.')
+                elif ',' in val:
+                    val = val.replace(',', '.')
+                try: return float(val)
+                except: return None
 
-        colunas_manter = ['Parceiro Descrição', 'Data', 'Valor', 'Evento Descrição', 'Histórico']
-        colunas_disponiveis = [c for c in colunas_manter if c in df.columns]
-        df = df[colunas_disponiveis].copy()
+            # NOVO PARSER DE DATA BLINDADO (Padrão BR)
+            def parse_date_br(val):
+                if pd.isna(val) or str(val).strip() == '': return ''
+                try: return pd.to_datetime(val, dayfirst=True).strftime('%d/%m/%Y')
+                except: return str(val)
 
-        df['Data'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True).dt.normalize()
-        df = df.dropna(subset=['Data'])
-
-        def parse_valor(v):
-            if pd.isna(v): return 0.0
-            if isinstance(v, (int, float)): return float(v)
-            v = str(v).replace('R$', '').strip()
-            if ',' in v and '.' in v:
-                v = v.replace('.', '').replace(',', '.')
-            elif ',' in v:
-                v = v.replace(',', '.')
-            try: return float(v)
-            except: return 0.0
-
-        df['Valor'] = df['Valor'].apply(parse_valor)
-        df['Histórico'] = df['Histórico'].fillna('').astype(str).str.strip().str.upper()
-        df['Origem_Argos'] = os.path.basename(filepath)
-        return df
+            df['Valor'] = df['Valor'].apply(parse_currency)
+            df['Data'] = df['Data'].apply(parse_date_br)
+            df['Histórico'] = df['Histórico'].fillna('')
+            
+            return df.dropna(subset=['Valor'])
+        except Exception as e:
+            print(f"Erro ao ler Argos {file_path}: {e}")
+            return pd.DataFrame()
 
     @staticmethod
-    def clean_bank(filepath: str) -> pd.DataFrame:
-        df_raw = pd.read_excel(filepath, header=None)
-        
-        if len(df_raw.columns) <= 3:
-            records = []
-            for val in df_raw.iloc[:, 0].dropna().astype(str):
-                match = re.search(r'^(\d{2}/\d{2}/\d{4})\s+(.*?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s*\+', val)
-                if match:
-                    records.append({
-                        'data_banco': pd.to_datetime(match.group(1), format='%d/%m/%Y'),
-                        'descricao_banco': match.group(2).strip(),
-                        'valor_banco': float(match.group(3).replace('.', '').replace(',', '.'))
-                    })
-            if records:
-                df = pd.DataFrame(records)
-                df['Origem_Banco'] = os.path.basename(filepath)
-                return df
+    def clean_bank(file_path: str) -> pd.DataFrame:
+        try:
+            import pandas as pd
+            df = pd.read_excel(file_path, engine='openpyxl')
+            
+            header_idx = None
+            for idx, row in df.iterrows():
+                row_str = ' '.join(str(val).lower() for val in row.values)
+                if 'data' in row_str and 'valor' in row_str:
+                    header_idx = idx
+                    break
+            
+            if header_idx is not None:
+                df = pd.read_excel(file_path, header=header_idx + 1, engine='openpyxl')
+            
+            col_mapping = {}
+            for col in df.columns:
+                col_lower = str(col).lower()
+                if 'data' in col_lower and 'Data' not in col_mapping.values(): 
+                    col_mapping[col] = 'Data'
+                elif ('histórico' in col_lower or 'historico' in col_lower or 'descrição' in col_lower or 'hitórico' in col_lower) and 'Histórico' not in col_mapping.values(): 
+                    col_mapping[col] = 'Histórico'
+                elif 'valor' in col_lower and 'Valor' not in col_mapping.values(): 
+                    col_mapping[col] = 'Valor'
+            
+            df = df.rename(columns=col_mapping)
+            df = df.loc[:, ~df.columns.duplicated()].copy()
+            cols_to_keep = [c for c in ['Data', 'Histórico', 'Valor'] if c in df.columns]
+            df = df[cols_to_keep]
+            
+            if 'Valor' not in df.columns: return pd.DataFrame()
+            if 'Histórico' not in df.columns: df['Histórico'] = ''
+            
+            df = df.dropna(subset=['Valor'])
+            
+            def parse_currency(val):
+                if pd.isna(val): return None
+                if isinstance(val, (int, float)): return float(val)
+                val = str(val).upper().replace('R$', '').strip()
+                if '.' in val and ',' in val:
+                    val = val.replace('.', '').replace(',', '.')
+                elif ',' in val:
+                    val = val.replace(',', '.')
+                try: return float(val)
+                except: return None
 
-        header_idx = -1
-        for i, row in df_raw.iterrows():
-            row_str = " ".join(row.dropna().astype(str).str.lower())
-            if ('data' in row_str) and ('valor' in row_str or 'cred' in row_str or 'créd' in row_str or 'lancamento' in row_str or 'lançamento' in row_str):
-                header_idx = i; break
+            def parse_date_br(val):
+                if pd.isna(val) or str(val).strip() == '': return ''
+                try: return pd.to_datetime(val, dayfirst=True).strftime('%d/%m/%Y')
+                except: return str(val)
 
-        if header_idx != -1:
-            df_raw.columns = df_raw.iloc[header_idx]
-            df = df_raw.iloc[header_idx+1:].reset_index(drop=True)
-        else:
-            df = df_raw.copy()
+            df['Valor'] = df['Valor'].apply(parse_currency)
+            df['Data'] = df['Data'].apply(parse_date_br)
+            df = df.dropna(subset=['Valor'])
+            df = df[df['Valor'] > 0]
+            df['Histórico'] = df['Histórico'].fillna('')
+            
+            nome_arquivo = str(file_path).lower()
+            banco_nome = "BANCO DESCONHECIDO"
+            if 'caixa' in nome_arquivo: banco_nome = 'CAIXA ECONOMICA'
+            elif 'banese' in nome_arquivo: banco_nome = 'BANESE'
+            df['Banco'] = banco_nome
+            
+            return df
+        except Exception as e:
+            print(f"Erro ao ler Banco {file_path}: {e}")
+            return pd.DataFrame()
 
-        df = df.loc[:, df.columns.notna()]
-        col_map = {}
-        for col in df.columns:
-            c = str(col).lower().strip()
-            if 'data' in c and 'data_banco' not in col_map.values(): 
-                col_map[col] = 'data_banco'
-            elif ('valor' in c or 'cred' in c or 'créd' in c or 'lançamento' in c or 'lancamento' in c) and 'valor_banco' not in col_map.values(): 
-                col_map[col] = 'valor_banco'
-            elif ('hist' in c or 'hitórico' in c or 'descrição' in c or 'detalhe' in c) and 'descricao_banco' not in col_map.values(): 
-                col_map[col] = 'descricao_banco'
 
-        df = df.rename(columns=col_map)
-        
-        if 'data_banco' not in df.columns or 'valor_banco' not in df.columns:
-            raise ValueError(f"ERRO: Não encontrei as colunas 'Data' e 'Valor' no extrato: {os.path.basename(filepath)}")
-        
-        colunas_finais = ['data_banco', 'valor_banco']
-        if 'descricao_banco' in df.columns: colunas_finais.append('descricao_banco')
-        df = df[colunas_finais].copy()
-        
-        if 'descricao_banco' not in df.columns:
-            df['descricao_banco'] = "Sem descrição no arquivo"
-        
-        df['data_banco'] = pd.to_datetime(df['data_banco'], errors='coerce').dt.normalize()
-        df = df.dropna(subset=['data_banco'])
-        df['valor_banco'] = df['valor_banco'].astype(str).str.replace('R$', '', regex=False).str.strip()
-        df['valor_banco'] = pd.to_numeric(df['valor_banco'].str.replace('.', '', regex=False).str.replace(',', '.', regex=False), errors='coerce')
-        df = df[df['valor_banco'] > 0].copy()
-        df['Origem_Banco'] = os.path.basename(filepath)
-        return df
 
 class ReconciliationEngine:
-    def __init__(self, df_argos: pd.DataFrame, df_bank: pd.DataFrame):
-        self.df_argos = df_argos.copy()
-        self.df_bank = df_bank.copy()
-        self.df_argos['status'] = 'pendente'
-        self.df_bank['status'] = 'pendente'
-        self.res_perfeito = []
-        self.res_historico = []
-        self.res_desmembrado = []
-        self.palavras_bloqueio = ['RESTANTE', 'OUTRA BAIXA', 'OUTRA NOTA', 'PARTE', 'DESMEMBRADO']
-
-    def match_exact(self):
-        for idx_a, row_a in self.df_argos[self.df_argos['status'] == 'pendente'].iterrows():
-            if any(palavra in row_a['Histórico'] for palavra in self.palavras_bloqueio):
-                continue
-
-            v_argos = row_a['Valor']
-            d_argos = row_a['Data']
-            candidatos = self.df_bank[
-                (self.df_bank['status'] == 'pendente') &
-                (self.df_bank['valor_banco'] == v_argos) &
-                (self.df_bank['data_banco'] >= d_argos - timedelta(days=3)) &
-                (self.df_bank['data_banco'] <= d_argos + timedelta(days=3))
-            ]
-            if not candidatos.empty:
-                idx_b = candidatos.index[0]
-                self.df_argos.at[idx_a, 'status'] = 'conciliado'
-                self.df_bank.at[idx_b, 'status'] = 'conciliado'
-                match_data = row_a.to_dict()
-                match_data['data_banco_real'] = candidatos.iloc[0]['data_banco']
-                match_data['Texto_Original_Banco'] = candidatos.iloc[0]['descricao_banco']
-                match_data['Banco_Real'] = candidatos.iloc[0]['Origem_Banco']
-                self.res_perfeito.append(match_data)
-
-    def match_by_history_regex(self):
-        regex = re.compile(r'(?:valor de|valor|pix de)?\s*([0-9]{1,3}(?:\.[0-9]{3})*\,[0-9]{2})', re.IGNORECASE)
-        for idx_a, row_a in self.df_argos[self.df_argos['status'] == 'pendente'].iterrows():
-            if any(palavra in row_a['Histórico'] for palavra in self.palavras_bloqueio):
-                continue
-
-            match = regex.search(row_a['Histórico'])
-            if match:
-                try: v_regex = float(match.group(1).replace('.', '').replace(',', '.'))
-                except: continue
-
-                # --- NOVA TRAVA DE SEGURANÇA ---
-                # Se a diferença entre a nota e o texto for muito grande (> 15 reais),
-                # não é um erro de centavos, é um PIX desmembrado que o vendedor anotou na observação!
-                # Ignoramos na Regra 2 e deixamos a Regra 3 somar as notas.
-                if abs(row_a['Valor'] - v_regex) > 15.0:
-                    continue
-                # -------------------------------
-
-                d_argos = row_a['Data']
-                candidatos = self.df_bank[
-                    (self.df_bank['status'] == 'pendente') &
-                    (self.df_bank['valor_banco'] == v_regex) &
-                    (self.df_bank['data_banco'] >= d_argos - timedelta(days=3)) &
-                    (self.df_bank['data_banco'] <= d_argos + timedelta(days=3))
-                ]
-                if not candidatos.empty:
-                    idx_b = candidatos.index[0]
-                    self.df_argos.at[idx_a, 'status'] = 'conciliado'
-                    self.df_bank.at[idx_b, 'status'] = 'conciliado'
-                    match_data = row_a.to_dict()
-                    match_data['valor_real_banco'] = v_regex
-                    match_data['data_banco_real'] = candidatos.iloc[0]['data_banco']
-                    match_data['Texto_Original_Banco'] = candidatos.iloc[0]['descricao_banco']
-                    match_data['Banco_Real'] = candidatos.iloc[0]['Origem_Banco']
-                    self.res_historico.append(match_data)
-
-    def match_split_sums(self):
-        pendentes_banco = self.df_bank[self.df_bank['status'] == 'pendente']
-        for idx_b, row_b in pendentes_banco.iterrows():
-            v_banco = row_b['valor_banco']
-            d_banco = row_b['data_banco']
-            
-            pendentes_argos = self.df_argos[self.df_argos['status'] == 'pendente']
-            
-            candidatos_argos = pendentes_argos[
-                (pendentes_argos['Data'] >= d_banco - timedelta(days=3)) &
-                (pendentes_argos['Data'] <= d_banco + timedelta(days=3)) &
-                (pendentes_argos['Valor'] < v_banco)
-            ]
-            
-            if candidatos_argos.empty: continue
-
-            achou = False
-            for parceiro in candidatos_argos['Parceiro Descrição'].unique():
-                candidatos_parceiro = candidatos_argos[candidatos_argos['Parceiro Descrição'] == parceiro]
-                if len(candidatos_parceiro) >= 2:
-                    candidatos_list = list(candidatos_parceiro['Valor'].to_dict().items())
-                    for r in range(2, min(5, len(candidatos_list) + 1)):
-                        for comb in itertools.combinations(candidatos_list, r):
-                            soma = sum(item[1] for item in comb)
-                            if round(soma, 2) == round(v_banco, 2):
-                                achou = [item[0] for item in comb]
-                                break
-                        if achou: break
-                if achou: break
-            
-            if achou:
-                self.df_bank.at[idx_b, 'status'] = 'conciliado'
-                for idx_a in achou:
-                    self.df_argos.at[idx_a, 'status'] = 'conciliado'
-                    match_data = self.df_argos.loc[idx_a].to_dict()
-                    match_data['vinculado_a_valor_banco'] = v_banco
-                    match_data['data_banco_real'] = row_b['data_banco']
-                    match_data['Texto_Original_Banco'] = row_b['descricao_banco']
-                    match_data['Banco_Real'] = row_b['Origem_Banco']
-                    self.res_desmembrado.append(match_data)
-
-    def formatar_aba_sucesso(self, dados):
-        if not dados:
-            return pd.DataFrame(columns=['BANCO', 'CLIENTES', 'VALOR', 'DATA PAGAMENTO', 'BAIXAS', 'DATA BAIXA', 'OBS'])
+    def __init__(self, df_argos, df_bank):
+        import pandas as pd
         
-        df = pd.DataFrame(dados)
-        
-        def padronizar_banco(nome):
-            if pd.isna(nome) or not nome: return ""
-            n = str(nome).lower()
-            if 'caixa' in n: return 'CAIXA ECONOMICA'
-            if 'banese' in n: return 'BANESE'
-            return nome
+        self.df_argos = df_argos.copy() if isinstance(df_argos, pd.DataFrame) else pd.DataFrame()
+        self.df_bank = df_bank.copy() if isinstance(df_bank, pd.DataFrame) else pd.DataFrame()
 
-        df['BANCO'] = df.get('Banco_Real', pd.Series(dtype='str')).apply(padronizar_banco)
-        df['CLIENTES'] = df['Parceiro Descrição']
-        df['VALOR'] = df['Valor']
-        df['DATA PAGAMENTO'] = df['data_banco_real']
-        df['BAIXAS'] = df.get('Origem_Argos', pd.Series(dtype='str')).apply(padronizar_banco)
-        df['DATA BAIXA'] = df['Data']
-        df['OBS'] = df['Histórico']
+        # BLINDAGEM: Garante que todos os valores monetários são floats matemáticos válidos
+        def safe_float(val):
+            if pd.isna(val): return 0.0
+            if isinstance(val, (int, float)): return float(val)
+            val = str(val).upper().replace('R$', '').strip()
+            if '.' in val and ',' in val:
+                val = val.replace('.', '').replace(',', '.')
+            elif ',' in val:
+                val = val.replace(',', '.')
+            try:
+                return float(val)
+            except:
+                return 0.0
 
-        return df[['BANCO', 'CLIENTES', 'VALOR', 'DATA PAGAMENTO', 'BAIXAS', 'DATA BAIXA', 'OBS']]
+        if not self.df_argos.empty and 'Valor' in self.df_argos.columns:
+            self.df_argos['Valor'] = self.df_argos['Valor'].apply(safe_float)
+            
+        if not self.df_bank.empty and 'Valor' in self.df_bank.columns:
+            self.df_bank['Valor'] = self.df_bank['Valor'].apply(safe_float)
+            # Filtra zeros ou erros de conversão
+            self.df_bank = self.df_bank[self.df_bank['Valor'] > 0]
+            self.df_argos = self.df_argos[self.df_argos['Valor'] > 0]
+
+        if not self.df_argos.empty:
+            self.df_argos['ID_Argos'] = range(len(self.df_argos))
+        if not self.df_bank.empty:
+            self.df_bank['ID_Bank'] = range(len(self.df_bank))
 
     def execute_pipeline(self):
-        self.match_exact()
-        self.match_by_history_regex()
-        self.match_split_sums()
-
-        df_1 = self.formatar_aba_sucesso(self.res_perfeito)
-        df_2 = self.formatar_aba_sucesso(self.res_historico)
-        df_3 = self.formatar_aba_sucesso(self.res_desmembrado)
-
-        max_data_banco = self.df_bank['data_banco'].max() if not self.df_bank.empty else pd.Timestamp.max
-
-        div_argos = self.df_argos[(self.df_argos['status'] == 'pendente') & (self.df_argos['Data'] <= max_data_banco)].copy()
-        div_argos['Origem_Divergencia'] = 'Falta no Banco'
-
-        div_banco = self.df_bank[self.df_bank['status'] == 'pendente'].copy()
-        div_banco_formatado = pd.DataFrame({
-            'Data': div_banco['data_banco'],
-            'Valor': div_banco['valor_banco'],
-            'Evento Descrição': div_banco['descricao_banco'],
-            'Origem_Banco': div_banco['Origem_Banco'],
-            'Origem_Divergencia': 'Sobrou no Banco / Faltou no Argos'
-        })
-
-        df_div_bruto = pd.concat([div_argos, div_banco_formatado], ignore_index=True)
+        import pandas as pd
+        import re
+        import itertools
         
-        if not df_div_bruto.empty:
-            def padronizar_banco(nome):
-                if pd.isna(nome) or not nome: return ""
-                n = str(nome).lower()
-                if 'caixa' in n: return 'CAIXA ECONOMICA'
-                if 'banese' in n: return 'BANESE'
-                return nome
-
-            df_div_bruto['BANCO'] = df_div_bruto.get('Origem_Banco', pd.Series(dtype='str')).apply(padronizar_banco)
-            df_div_bruto['BAIXAS'] = df_div_bruto.get('Origem_Argos', pd.Series(dtype='str')).apply(padronizar_banco)
-            df_div_bruto['CLIENTES'] = df_div_bruto.apply(lambda r: r['Parceiro Descrição'] if pd.notna(r.get('Parceiro Descrição')) else r.get('Evento Descrição', ''), axis=1)
-            df_div_bruto['VALOR'] = df_div_bruto['Valor']
-            
-            df_div_bruto['DATA PAGAMENTO'] = df_div_bruto.apply(lambda r: r['Data'] if r['Origem_Divergencia'] == 'Sobrou no Banco / Faltou no Argos' else pd.NaT, axis=1)
-            df_div_bruto['DATA BAIXA'] = df_div_bruto.apply(lambda r: r['Data'] if r['Origem_Divergencia'] == 'Falta no Banco' else pd.NaT, axis=1)
-            
-            df_div_bruto['OBS'] = df_div_bruto.apply(lambda r: r['Histórico'] if pd.notna(r.get('Histórico')) else r.get('Evento Descrição', ''), axis=1)
-            df_div_bruto['MOTIVO DIVERGÊNCIA'] = df_div_bruto['Origem_Divergencia']
-
-            df_div_final = df_div_bruto[['BANCO', 'CLIENTES', 'VALOR', 'DATA PAGAMENTO', 'BAIXAS', 'DATA BAIXA', 'OBS', 'MOTIVO DIVERGÊNCIA']]
-        else:
-            df_div_final = pd.DataFrame(columns=['BANCO', 'CLIENTES', 'VALOR', 'DATA PAGAMENTO', 'BAIXAS', 'DATA BAIXA', 'OBS', 'MOTIVO DIVERGÊNCIA'])
-
-        return {
-            '1_Conciliado_Perfeito': df_1,
-            '2_Conciliado_Via_Historico': df_2,
-            '3_Conciliado_Desmembrado': df_3,
-            '4_Divergencias_Pendentes': df_div_final
+        resultados = {
+            '1_Conciliado_Perfeito': [],
+            '2_Conciliado_Via_Historico': [],
+            '3_Conciliado_Desmembrado': [],
+            '4_Divergencias_Pendentes': []
         }
+
+        if self.df_argos.empty or self.df_bank.empty:
+            for k in resultados.keys():
+                resultados[k] = pd.DataFrame(columns=['Banco', 'Cliente', 'Valor', 'Data', 'Histórico', 'Baixas', 'Data Baixa', 'Motivo Divergência'])
+            return resultados
+
+        argos_pendentes = self.df_argos.copy()
+        bank_pendentes = self.df_bank.copy()
+
+        def remover_matched(ids_a, ids_b):
+            nonlocal argos_pendentes, bank_pendentes
+            argos_pendentes = argos_pendentes[~argos_pendentes['ID_Argos'].isin(ids_a)]
+            bank_pendentes = bank_pendentes[~bank_pendentes['ID_Bank'].isin(ids_b)]
+
+        # ==========================================
+        # REGRA 2 e 2.5: VIA HISTÓRICO & DESMEMBRADO GUIADO
+        # PRIORIDADE MÁXIMA: A intenção humana (escrita) supera a matemática crua.
+        # ==========================================
+        regex = re.compile(r'(?:PIX.*?|VALOR DE|COMPROVANTE.*?|DE\s*)\s*R?\$?\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)', re.IGNORECASE)
+        m_a, m_b = [], []
+        
+        for i, row_a in argos_pendentes.iterrows():
+            if row_a['ID_Argos'] in m_a: continue
+            
+            col_hist = 'OBS' if 'OBS' in row_a else 'Histórico'
+            match = regex.search(str(row_a.get(col_hist, '')))
+            
+            if match:
+                val_str = match.group(1).replace('.', '').replace(',', '.')
+                try: 
+                    v_regex = float(val_str)
+                except: 
+                    continue
+                
+                candidatos = bank_pendentes[(bank_pendentes['Valor'] == v_regex) & (~bank_pendentes['ID_Bank'].isin(m_b))].copy()
+                if not candidatos.empty:
+                    candidatos['diff_dias'] = abs((pd.to_datetime(row_a['Data'], format='%d/%m/%Y', errors='coerce') - 
+                                                   pd.to_datetime(candidatos['Data'], format='%d/%m/%Y', errors='coerce')).dt.days)
+                    candidatos = candidatos.sort_values(by='diff_dias')
+                    
+                    for j, row_b in candidatos.iterrows():
+                        if pd.notna(row_b['diff_dias']) and row_b['diff_dias'] <= 5: 
+                            valor_faltante = round(v_regex - row_a['Valor'], 2)
+                            comb_encontrada = []
+                            
+                            # Tenta Desmembrar (OTIMIZADO)
+                            if valor_faltante > 0.05:
+                                # FILTRO CRÍTICO: Limita a busca a notas que "cabem" no espaço vazio, evitando loop O(N³)
+                                outras_notas = argos_pendentes[
+                                    (~argos_pendentes['ID_Argos'].isin(m_a)) & 
+                                    (argos_pendentes['ID_Argos'] != row_a['ID_Argos']) &
+                                    (argos_pendentes['Valor'] <= valor_faltante + 0.05)
+                                ]
+                                fast_notas = [(row['ID_Argos'], row['Valor'], row.to_dict()) for idx, row in outras_notas.iterrows()]
+                                
+                                for r in range(1, min(4, len(fast_notas) + 1)):
+                                    for comb in itertools.combinations(fast_notas, r):
+                                        if abs(sum(item[1] for item in comb) - valor_faltante) < 0.05:
+                                            comb_encontrada = [item[2].copy() for item in comb]
+                                            break
+                                    if comb_encontrada: break
+                            
+                            if comb_encontrada:
+                                nota_principal = row_a.to_dict().copy()
+                                nota_principal['Baixas'] = row_b['Banco']
+                                nota_principal['Data Baixa'] = row_b['Data']
+                                resultados['3_Conciliado_Desmembrado'].append(nota_principal)
+                                m_a.append(row_a['ID_Argos'])
+                                
+                                for np in comb_encontrada:
+                                    np['Baixas'] = row_b['Banco']
+                                    np['Data Baixa'] = row_b['Data']
+                                    resultados['3_Conciliado_Desmembrado'].append(np)
+                                    m_a.append(np['ID_Argos'])
+                                    
+                                m_b.append(row_b['ID_Bank'])
+                                break
+                            
+                            # Se não achou peças mas está dentro do desconto de R$ 15
+                            elif abs(row_a['Valor'] - v_regex) <= 15.0:
+                                nota = row_a.to_dict().copy()
+                                nota['Baixas'] = row_b['Banco']
+                                nota['Data Baixa'] = row_b['Data']
+                                sinal = "+" if valor_faltante > 0 else ""
+                                nota['Motivo Divergência'] = f'Desconto/Acréscimo no PIX ({sinal}R$ {valor_faltante})'
+                                resultados['2_Conciliado_Via_Historico'].append(nota)
+                                m_a.append(row_a['ID_Argos'])
+                                m_b.append(row_b['ID_Bank'])
+                                break
+        remover_matched(m_a, m_b)
+
+        # ==========================================
+        # REGRA 1: CONCILIADO PERFEITO (Valores Exatos)
+        # ==========================================
+        m_a, m_b = [], []
+        for i, row_a in argos_pendentes.iterrows():
+            candidatos = bank_pendentes[(bank_pendentes['Valor'] == row_a['Valor']) & (~bank_pendentes['ID_Bank'].isin(m_b))].copy()
+            if not candidatos.empty:
+                candidatos['diff_dias'] = abs((pd.to_datetime(row_a['Data'], format='%d/%m/%Y', errors='coerce') - 
+                                               pd.to_datetime(candidatos['Data'], format='%d/%m/%Y', errors='coerce')).dt.days)
+                candidatos = candidatos.sort_values(by='diff_dias')
+                
+                for j, row_b in candidatos.iterrows():
+                    if pd.notna(row_b['diff_dias']) and row_b['diff_dias'] <= 3:
+                        nota = row_a.to_dict().copy()
+                        nota['Baixas'] = row_b['Banco']
+                        nota['Data Baixa'] = row_b['Data']
+                        resultados['1_Conciliado_Perfeito'].append(nota)
+                        m_a.append(row_a['ID_Argos'])
+                        m_b.append(row_b['ID_Bank'])
+                        break
+        remover_matched(m_a, m_b)
+
+        # ==========================================
+        # REGRA 3: DESMEMBRADOS (Força Bruta Restante)
+        # ==========================================
+        m_a, m_b = [], []
+        col_cliente = 'CLIENTES' if 'CLIENTES' in argos_pendentes.columns else 'Cliente'
+        
+        for cliente, grupo in argos_pendentes.groupby(col_cliente):
+            # OTIMIZAÇÃO: Ignora grupos massivos para evitar gargalo
+            if len(grupo) < 2 or len(grupo) > 25: continue
+            fast_grupo = [(row['ID_Argos'], row['Valor'], row.to_dict()) for idx, row in grupo.iterrows()]
+            
+            for r in range(2, min(4, len(grupo) + 1)):
+                for comb in itertools.combinations(fast_grupo, r):
+                    soma_argos = sum(item[1] for item in comb)
+                    ids_comb = [item[0] for item in comb]
+                    if any(id_a in m_a for id_a in ids_comb): continue
+                        
+                    candidatos = bank_pendentes[(bank_pendentes['Valor'].between(soma_argos - 0.05, soma_argos + 0.05)) & (~bank_pendentes['ID_Bank'].isin(m_b))].copy()
+                    if not candidatos.empty:
+                        candidatos['diff_dias'] = abs((pd.to_datetime(grupo.iloc[0]['Data'], format='%d/%m/%Y', errors='coerce') - 
+                                                       pd.to_datetime(candidatos['Data'], format='%d/%m/%Y', errors='coerce')).dt.days)
+                        candidatos = candidatos.sort_values(by='diff_dias')
+                        row_b = candidatos.iloc[0]
+                        
+                        # CORREÇÃO: Cadeado de Data adicionado!
+                        if pd.notna(row_b['diff_dias']) and row_b['diff_dias'] <= 5:
+                            for item in comb:
+                                nota = item[2].copy()
+                                nota['Baixas'] = row_b['Banco']
+                                nota['Data Baixa'] = row_b['Data']
+                                resultados['3_Conciliado_Desmembrado'].append(nota)
+                                m_a.append(nota['ID_Argos'])
+                            m_b.append(row_b['ID_Bank'])
+                            break
+        remover_matched(m_a, m_b)
+
+        # ==========================================
+        # REGRA 3.5: CONCILIADO POR APROXIMAÇÃO DE CENTAVOS (Último Recurso)
+        # ==========================================
+        m_a, m_b = [], []
+        if not argos_pendentes.empty and not bank_pendentes.empty:
+            for i, row_a in argos_pendentes.iterrows():
+                candidatos = bank_pendentes[(abs(bank_pendentes['Valor'] - row_a['Valor']) > 0) & 
+                                            (abs(bank_pendentes['Valor'] - row_a['Valor']) <= 1.50) & 
+                                            (~bank_pendentes['ID_Bank'].isin(m_b))].copy()
+                if not candidatos.empty:
+                    candidatos['diff_dias'] = abs((pd.to_datetime(row_a['Data'], format='%d/%m/%Y', errors='coerce') - 
+                                                   pd.to_datetime(candidatos['Data'], format='%d/%m/%Y', errors='coerce')).dt.days)
+                    candidatos = candidatos.sort_values(by='diff_dias')
+                    
+                    for j, row_b in candidatos.iterrows():
+                        if pd.notna(row_b['diff_dias']) and row_b['diff_dias'] <= 3:
+                            nota = row_a.to_dict().copy()
+                            nota['Baixas'] = row_b['Banco']
+                            nota['Data Baixa'] = row_b['Data']
+                            diff_valor = round(row_b['Valor'] - row_a['Valor'], 2)
+                            sinal = "+" if diff_valor > 0 else ""
+                            nota['Motivo Divergência'] = f'Aproximação de Centavos ({sinal}R$ {diff_valor})'
+                            resultados['1_Conciliado_Perfeito'].append(nota)
+                            m_a.append(row_a['ID_Argos'])
+                            m_b.append(row_b['ID_Bank'])
+                            break
+            remover_matched(m_a, m_b)
+
+        # ==========================================
+        # REGRA 4: DIVERGÊNCIAS PENDENTES
+        # ==========================================
+        for i, row_a in argos_pendentes.iterrows():
+            nota = row_a.to_dict().copy()
+            nota['Motivo Divergência'] = 'Falta no Banco'
+            resultados['4_Divergencias_Pendentes'].append(nota)
+            
+        for i, row_b in bank_pendentes.iterrows():
+            col_hist_b = 'Histórico' if 'Histórico' in row_b else 'N/A'
+            nota = {
+                'Banco': row_b['Banco'],
+                col_cliente: row_b.get(col_hist_b, 'N/A'),
+                'Valor': row_b['Valor'],
+                'Data': row_b['Data'],
+                'Motivo Divergência': 'Sobrou no Banco / Faltou no Argos'
+            }
+            resultados['4_Divergencias_Pendentes'].append(nota)
+
+        # ==========================================
+        # FORMATAÇÃO FINAL DAS COLUNAS (Alinhado com o Template da Cliente)
+        # Ordem Exata: Banco | Cliente | Valor | Data (Pgto) | Baixas (Banco Baixa) | Data Baixa | Histórico | Motivo
+        # ==========================================
+        ordem_colunas = ['Banco', 'Cliente', 'Valor', 'Data', 'Baixas', 'Data Baixa', 'Histórico', 'Motivo Divergência']
+        
+        for k in resultados.keys():
+            df = pd.DataFrame(resultados[k])
+            if df.empty:
+                df = pd.DataFrame(columns=ordem_colunas)
+            else:
+                if 'ID_Argos' in df.columns: df = df.drop(columns=['ID_Argos'])
+                if 'ID_Bank' in df.columns: df = df.drop(columns=['ID_Bank'])
+                if 'CLIENTES' in df.columns: df = df.drop(columns=['CLIENTES'])
+                
+                # Garante que todas as colunas existem antes de reordenar
+                for col in ordem_colunas:
+                    if col not in df.columns:
+                        df[col] = ''
+                
+                df = df[ordem_colunas]
+            resultados[k] = df
+
+        return resultados
+
+
+
 
 class ExcelReporter:
     @staticmethod
     def generate_report(data_sheets: dict, output_path: str):
-        # --- NOVO: Tratamento de Nomes das Abas e Colunas antes de exportar ---
         formatted_sheets = {}
         
-        # Dicionário tradutor (De -> Para)
         mapa_colunas = {
             'BANCO': 'BANCO',
+            'Banco': 'BANCO',
             'CLIENTES': 'CLIENTE',
+            'Cliente': 'CLIENTE',
             'VALOR': 'VALOR DA BAIXA',
+            'Valor': 'VALOR DA BAIXA',
             'DATA PAGAMENTO': 'DATA DO PAGAMENTO',
+            'Data': 'DATA DO PAGAMENTO',
             'BAIXAS': 'BANCO DA BAIXA',
+            'Baixas': 'BANCO DA BAIXA',
             'DATA BAIXA': 'DATA DA BAIXA',
-            'OBS': 'HISTÓRICO'
+            'Data Baixa': 'DATA DA BAIXA',
+            'OBS': 'HISTÓRICO',
+            'Histórico': 'HISTÓRICO',
+            'Motivo Divergência': 'MOTIVO DIVERGÊNCIA'
         }
         
+        ordem_desejada = ['BANCO', 'CLIENTE', 'VALOR DA BAIXA', 'DATA DO PAGAMENTO', 'BANCO DA BAIXA', 'DATA DA BAIXA', 'HISTÓRICO', 'MOTIVO DIVERGÊNCIA']
+        
         for sheet_name, df in data_sheets.items():
-            # Remove os "_" dos nomes das abas (ex: "1_Conciliado_Perfeito" -> "1 Conciliado Perfeito")
             novo_nome_aba = sheet_name.replace('_', ' ')
-            
             if not df.empty:
-                # Aplica o dicionário tradutor para renomear as colunas
                 df = df.rename(columns=mapa_colunas)
+                colunas_finais = [c for c in ordem_desejada if c in df.columns]
+                df = df[colunas_finais]
+            else:
+                df = pd.DataFrame(columns=[c for c in ordem_desejada if c != 'MOTIVO DIVERGÊNCIA'])
             
             formatted_sheets[novo_nome_aba] = df
 
         with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
             for sheet_name, df in formatted_sheets.items():
                 if df.empty:
-                    pd.DataFrame({'Aviso': ['Nenhum registo encontrado.']}).to_excel(writer, sheet_name=sheet_name, index=False)
+                    pd.DataFrame({'Aviso': ['Nenhum registo encontrado nesta categoria.']}).to_excel(writer, sheet_name=sheet_name, index=False)
                     continue
                 
                 for col in df.columns:
@@ -338,7 +482,6 @@ class ExcelReporter:
                 df.to_excel(writer, sheet_name=sheet_name, index=False, startrow=4)
                 worksheet = writer.sheets[sheet_name]
 
-                # --- PALETA DE CORES INSTITUCIONAIS E FONTES ---
                 header_fill = PatternFill(start_color='266C40', end_color='266C40', fill_type='solid')
                 fill_verde_claro = PatternFill(start_color='719C82', end_color='719C82', fill_type='solid')
                 fill_branco = PatternFill(start_color='FFFFFF', end_color='FFFFFF', fill_type='solid')
@@ -356,7 +499,6 @@ class ExcelReporter:
                 col_indices = {str(worksheet.cell(row=5, column=i).value).upper(): i for i in range(1, worksheet.max_column + 1)}
                 max_col = worksheet.max_column
 
-                # 0. Fundo verde nas 4 primeiras linhas e Altura exata
                 for r in range(1, 5):
                     for c in range(1, max_col + 1):
                         worksheet.cell(row=r, column=c).fill = fill_verde_claro
@@ -366,7 +508,6 @@ class ExcelReporter:
                 worksheet.row_dimensions[3].height = 12
                 worksheet.row_dimensions[4].height = 12
 
-                # --- INSERIR LOGOMARCA ---
                 try:
                     from openpyxl.drawing.image import Image as ExcelImage
                     from PIL import Image as PILImage
@@ -388,20 +529,17 @@ class ExcelReporter:
                         else:
                             coluna_alvo = 5 
                             
-                        col_letra_alvo = get_column_letter(coluna_alvo)
+                        col_letra_alvo = get_column_letter(max(1, coluna_alvo))
                         worksheet.add_image(img, f'{col_letra_alvo}2')
                 except Exception as e:
-                    print(f"Aviso: Não foi possível inserir a imagem. Erro: {e}")
+                    pass
 
-                # 1. Formatação Visual de Cabeçalhos (Linha 5)
                 for cell in worksheet[5]:
                     cell.fill = header_fill
                     cell.font = font_branca_bold
-                    # GARANTIA: Sem quebra de linha nos títulos (wrap_text=False)
                     cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
                     cell.border = borda_fina
 
-                # 2. Formatação das Células de Dados (Começam na linha 6)
                 for row in range(6, worksheet.max_row + 1):
                     is_zebra = (row % 2 == 0)
 
@@ -412,7 +550,6 @@ class ExcelReporter:
                         cell.font = font_preta_bold
                         cell.border = borda_fina
 
-                        # Atualizamos as referências para os NOVOS nomes das colunas!
                         if col_name in ['BANCO', 'BANCO DA BAIXA']:
                             cell.fill = fill_verde_claro
                             cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
@@ -431,7 +568,6 @@ class ExcelReporter:
                                 except:
                                     pass
 
-                # 3. Auto-Fit: Ajustar a largura das colunas dinamicamente
                 for col_idx in range(1, max_col + 1):
                     max_length = 0
                     col_letter = get_column_letter(col_idx)
@@ -439,7 +575,6 @@ class ExcelReporter:
                     if not col_name_val: continue
                     col_name = str(col_name_val).upper()
                     
-                    # Garante um respiro largo para os títulos (evitando a quebra de linha)
                     max_length = len(col_name) + 3 
                     
                     for row_idx in range(5, worksheet.max_row + 1):
@@ -452,7 +587,6 @@ class ExcelReporter:
                         except:
                             pass
                     
-                    # Definimos larguras mínimas baseadas nos novos textos
                     if col_name in ['BANCO', 'BANCO DA BAIXA']:
                         worksheet.column_dimensions[col_letter].width = max(max_length, 20)
                     elif col_name == 'VALOR DA BAIXA':
@@ -462,31 +596,6 @@ class ExcelReporter:
                     else:
                         worksheet.column_dimensions[col_letter].width = min(max_length + 2, 50)
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Conciliacao Bancaria Global")
-    parser.add_argument('--argos', nargs='+', required=True, help="Ficheiros do Argos")
-    parser.add_argument('--bancos', nargs='+', required=True, help="Extratos dos Bancos")
-    args = parser.parse_args()
-
-    print("\n[1/3] Limpando e unificando arquivos do Argos...")
-    dfs_argos = [DataCleaner.clean_argos(arq) for arq in args.argos]
-    df_argos_full = pd.concat(dfs_argos, ignore_index=True) if dfs_argos else pd.DataFrame()
-    print(f"      -> {len(df_argos_full)} registros lidos de {len(args.argos)} arquivo(s).")
-
-    print("[2/3] Inteligência Artificial limpando e unificando extratos bancarios...")
-    dfs_bancos = [DataCleaner.clean_bank(arq) for arq in args.bancos]
-    df_bancos_full = pd.concat(dfs_bancos, ignore_index=True) if dfs_bancos else pd.DataFrame()
-    print(f"      -> {len(df_bancos_full)} depositos validos lidos de {len(args.bancos)} arquivo(s).")
-
-    print("[3/3] Cruzando todas as informacoes (Motor Global)...")
-    engine = ReconciliationEngine(df_argos_full, df_bancos_full)
-    relatorios = engine.execute_pipeline()
-
-    print(f"      -> Conciliados Perfeitos   : {len(relatorios['1_Conciliado_Perfeito'])}")
-    print(f"      -> Lidos via Histórico     : {len(relatorios['2_Conciliado_Via_Historico'])}")
-    print(f"      -> Valores Desmembrados    : {len(relatorios['3_Conciliado_Desmembrado'])}")
-    print(f"      -> DIVERGENCIAS PENDENTES  : {len(relatorios['4_Divergencias_Pendentes'])}")
-
-    output = "conciliacao_global_final.xlsx"
-    ExcelReporter.generate_report(relatorios, output)
-    print(f"\n[OK] Concluido! Planilha salva como: {output}\n")
+    pass

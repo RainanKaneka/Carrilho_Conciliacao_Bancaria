@@ -329,11 +329,8 @@ async def conciliar(
         if not dfs_argos:
             raise ValueError("Nenhum arquivo Argos válido foi processado.")
 
-        df_argos_full = (
-            pd.concat(dfs_argos, ignore_index=True)
-            if len(dfs_argos) > 1
-            else dfs_argos[0]
-        )
+        dfs_argos_validos = [df for df in dfs_argos if df is not None and not df.empty]
+        df_argos_full = pd.concat(dfs_argos_validos, ignore_index=True) if dfs_argos_validos else pd.DataFrame()
         logger.info(
             f"Argos consolidado: {len(df_argos_full)} registro(s) no total."
         )
@@ -349,11 +346,8 @@ async def conciliar(
         if not dfs_banco:
             raise ValueError("Nenhum arquivo de extrato bancário válido foi processado.")
 
-        df_banco_full = (
-            pd.concat(dfs_banco, ignore_index=True)
-            if len(dfs_banco) > 1
-            else dfs_banco[0]
-        )
+        dfs_bancos_validos = [df for df in dfs_banco if df is not None and not df.empty]
+        df_banco_full = pd.concat(dfs_bancos_validos, ignore_index=True) if dfs_bancos_validos else pd.DataFrame()
         logger.info(
             f"Banco consolidado: {len(df_banco_full)} crédito(s) no total."
         )
