@@ -36,14 +36,43 @@ from fastapi.staticfiles import StaticFiles
 
 import pandas as pd
 import uvicorn
-from fastapi import FastAPI, File, Form, UploadFile, BackgroundTasks, HTTPException
+from fastapi import FastAPI, File, Form, UploadFile, BackgroundTasks, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+load_dotenv()
+
+try:
+    from supabase import create_client, Client
+    SUPABASE_URL = os.environ.get("SUPABASE_URL")
+    SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+    if SUPABASE_URL and SUPABASE_KEY:
+        supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    else:
+        supabase_client = None
+except ImportError:
+    supabase_client = None
+
+security = HTTPBearer()
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not supabase_client:
+        raise HTTPException(status_code=500, detail="Autenticação não configurada.")
+    try:
+        user = supabase_client.auth.get_user(credentials.credentials)
+        return user
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Credenciais de autenticação inválidas.")
 
 class PeriodoUpdate(BaseModel):
     periodo: str
+
+class AnotacaoUpdate(BaseModel):
+    anotacao: str
 
 # ---------------------------------------------------------------------------
 # Importação do motor de conciliação (mesmo diretório)
@@ -70,37 +99,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Configuração do Banco de Dados SQLite (Memória do Sistema)
+# Supabase já é inicializado para Autenticação. Usaremos o mesmo client
+# para as tabelas e o Storage.
 # ---------------------------------------------------------------------------
-DB_PATH = Path(__file__).parent / "historico.db"
-ARQUIVOS_ANTIGOS_DIR = Path(__file__).parent / "arquivos_antigos"
-ARQUIVOS_ANTIGOS_DIR.mkdir(parents=True, exist_ok=True)
-
-def init_db():
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS conciliacoes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                data_processamento DATETIME,
-                perfeitos INTEGER,
-                historico INTEGER,
-                desmembrados INTEGER,
-                divergencias INTEGER,
-                taxa_sucesso REAL,
-                caminho_arquivo TEXT
-            )
-        """)
-        
-        # Migração: adicionar coluna periodo se não existir
-        try:
-            cursor.execute("ALTER TABLE conciliacoes ADD COLUMN periodo TEXT DEFAULT 'Desconhecido'")
-        except sqlite3.OperationalError:
-            pass # A coluna já existe
-            
-        conn.commit()
-
-init_db()
 
 # ---------------------------------------------------------------------------
 # Instância do Aplicativo FastAPI
@@ -261,6 +262,7 @@ async def conciliar(
     argos_files: List[UploadFile] = File(..., description="Arquivos do sistema Argos (.xlsx)"),
     banco_files: List[UploadFile] = File(..., description="Extratos bancários (.xlsx)"),
     banco_nome: str = Form(default="generico", description="Nome do banco: caixa | banese | generico"),
+    user: dict = Depends(get_current_user)
 ) -> JSONResponse:
     """
     Endpoint principal de concilição bancária.
@@ -361,14 +363,14 @@ async def conciliar(
         for chave, df_resultado in relatorios.items():
             logger.info(f"  {chave}: {len(df_resultado)} registro(s)")
 
-        # ── Etapa 6: Gerar arquivo Excel de saída e salvar no Arquivo Morto ──
+        # ── Etapa 6: Gerar arquivo Excel de saída temporário ──
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         nome_arquivo = f"Conciliacao_{timestamp}.xlsx"
-        caminho_saida = ARQUIVOS_ANTIGOS_DIR / nome_arquivo
+        caminho_saida = pasta_temp / nome_arquivo
 
         logger.info(f"Gerando Excel em: {caminho_saida.name}...")
         ExcelReporter.generate_report(relatorios, str(caminho_saida))
-        logger.info("Excel gerado e salvo no Arquivo Morto com sucesso.")
+        logger.info("Excel gerado com sucesso.")
 
         # ── Etapa 7: Ler o Excel gerado para memória e converter para Base64 ──
         with open(caminho_saida, "rb") as f:
@@ -379,10 +381,11 @@ async def conciliar(
         qtd_perfeitos = len(relatorios.get("1_Conciliado_Perfeito", []))
         qtd_historico = len(relatorios.get("2_Conciliado_Via_Historico", []))
         qtd_desmembrado = len(relatorios.get("3_Conciliado_Desmembrado", []))
-        qtd_divergencias = len(relatorios.get("4_Divergencias_Pendentes", []))
+        qtd_saidas_estornos = len(relatorios.get("4_Saidas_Estornos", []))
+        qtd_divergencias = len(relatorios.get("5_Divergencias_Pendentes", []))
 
-        # Cálculo da Taxa de Sucesso
-        sucesso = qtd_perfeitos + qtd_historico + qtd_desmembrado
+        # Cálculo da Taxa de Sucesso (incluindo saidas_estornos no sucesso para não penalizar a taxa)
+        sucesso = qtd_perfeitos + qtd_historico + qtd_desmembrado + qtd_saidas_estornos
         total = sucesso + qtd_divergencias
         taxa_sucesso = (sucesso / total * 100) if total > 0 else 0.0
 
@@ -406,16 +409,28 @@ async def conciliar(
         except Exception as e:
             print(f"Aviso: Erro ao extrair período: {e}")
 
-        # Gravar histórico no Banco de Dados
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO conciliacoes 
-                (data_processamento, perfeitos, historico, desmembrados, divergencias, taxa_sucesso, caminho_arquivo, periodo)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (datetime.now(), qtd_perfeitos, qtd_historico, qtd_desmembrado, qtd_divergencias, taxa_sucesso, str(caminho_saida), periodo_str))
-            novo_id = cursor.lastrowid
-            conn.commit()
+        # Upload arquivo para Supabase Storage
+        file_name = f"{uuid.uuid4()}_{caminho_saida.name}"
+        with open(caminho_saida, 'rb') as f:
+            supabase_client.storage.from_("arquivos_antigos").upload(
+                file_name,
+                f.read(),
+                {"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+            )
+            
+        # Gravar histórico no Banco de Dados (Supabase PostgreSQL)
+        novo_registro = {
+            "perfeitos": qtd_perfeitos,
+            "historico": qtd_historico,
+            "desmembrados": qtd_desmembrado,
+            "divergencias": qtd_divergencias,
+            "taxa_sucesso": taxa_sucesso,
+            "caminho_arquivo": file_name,
+            "periodo": periodo_str,
+            "saidas_estornos": qtd_saidas_estornos
+        }
+        res_db = supabase_client.table("conciliacoes").insert(novo_registro).execute()
+        novo_id = res_db.data[0]["id"] if res_db.data else None
 
         # Devolve o JSON com os resultados e o ficheiro
         return {
@@ -423,6 +438,7 @@ async def conciliar(
                 "perfeitos": qtd_perfeitos,
                 "historico": qtd_historico,
                 "desmembrados": qtd_desmembrado,
+                "saidas_estornos": qtd_saidas_estornos,
                 "divergencias": qtd_divergencias
             },
             "ficheiro_base64": base64_encoded,
@@ -481,47 +497,42 @@ async def conciliar(
 # ---------------------------------------------------------------------------
 
 @app.get("/api/historico", tags=["Histórico"])
-async def obter_historico() -> JSONResponse:
+async def obter_historico(user: dict = Depends(get_current_user)) -> JSONResponse:
     """
     Retorna a lista de todas as conciliações executadas no passado,
     ordenada da mais recente para a mais antiga.
     """
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM conciliacoes ORDER BY data_processamento DESC")
-            linhas = cursor.fetchall()
-            
-            resultados = [dict(linha) for linha in linhas]
-            return JSONResponse(content=resultados)
+        res = supabase_client.table("conciliacoes").select("*").order("data_processamento", desc=True).execute()
+        return JSONResponse(content=res.data)
     except Exception as exc:
         logger.error(f"Erro ao buscar histórico: {exc}")
         raise HTTPException(status_code=500, detail="Erro ao ler o histórico do banco de dados.")
 
 @app.get("/api/download/{id}", tags=["Histórico"])
-async def baixar_arquivo_antigo(id: int):
+async def baixar_arquivo_antigo(id: int, user: dict = Depends(get_current_user)):
     """
     Baixa um arquivo de conciliação do Arquivo Morto pelo seu ID.
     """
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT caminho_arquivo FROM conciliacoes WHERE id = ?", (id,))
-            linha = cursor.fetchone()
+        res = supabase_client.table("conciliacoes").select("caminho_arquivo").eq("id", id).execute()
+        
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Conciliação não encontrada.")
+        
+        file_name = res.data[0]["caminho_arquivo"]
+        if not file_name:
+            raise HTTPException(status_code=404, detail="Arquivo não associado à conciliação.")
             
-            if not linha:
-                raise HTTPException(status_code=404, detail="Conciliação não encontrada.")
+        storage_res = supabase_client.storage.from_("arquivos_antigos").download(file_name)
+        
+        from fastapi.responses import Response
+        return Response(
+            content=storage_res,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={file_name.split('_', 1)[-1]}"}
+        )
             
-            caminho_arquivo = Path(linha[0])
-            if not caminho_arquivo.exists():
-                raise HTTPException(status_code=404, detail="Arquivo Excel não encontrado no disco.")
-                
-            return FileResponse(
-                path=caminho_arquivo,
-                filename=caminho_arquivo.name,
-                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
     except HTTPException:
         raise
     except Exception as exc:
@@ -529,31 +540,28 @@ async def baixar_arquivo_antigo(id: int):
         raise HTTPException(status_code=500, detail="Erro interno ao processar o download.")
 
 @app.delete("/api/historico/{id}", tags=["Histórico"])
-async def excluir_historico(id: int):
+async def excluir_historico(id: int, user: dict = Depends(get_current_user)):
     """
     Exclui o histórico de conciliação do banco de dados e apaga o arquivo físico.
     """
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT caminho_arquivo FROM conciliacoes WHERE id = ?", (id,))
-            linha = cursor.fetchone()
-            
-            if not linha:
-                raise HTTPException(status_code=404, detail="Conciliação não encontrada.")
-            
-            caminho_arquivo = Path(linha[0])
-            if caminho_arquivo.exists():
-                try:
-                    os.remove(caminho_arquivo)
-                    logger.info(f"Arquivo físico removido: {caminho_arquivo.name}")
-                except OSError as exc:
-                    logger.warning(f"Não foi possível remover o arquivo {caminho_arquivo.name}: {exc}")
-            
-            cursor.execute("DELETE FROM conciliacoes WHERE id = ?", (id,))
-            conn.commit()
-            
-            return JSONResponse(content={"status": "success", "message": "Histórico excluído com sucesso."})
+        res = supabase_client.table("conciliacoes").select("caminho_arquivo").eq("id", id).execute()
+        
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Conciliação não encontrada.")
+        
+        file_name = res.data[0]["caminho_arquivo"]
+        
+        if file_name:
+            try:
+                supabase_client.storage.from_("arquivos_antigos").remove([file_name])
+                logger.info(f"Arquivo removido do Supabase Storage: {file_name}")
+            except Exception as exc:
+                logger.warning(f"Não foi possível remover o arquivo no Storage: {exc}")
+        
+        supabase_client.table("conciliacoes").delete().eq("id", id).execute()
+        
+        return JSONResponse(content={"status": "success", "message": "Histórico excluído com sucesso."})
     except HTTPException:
         raise
     except Exception as exc:
@@ -561,23 +569,36 @@ async def excluir_historico(id: int):
         raise HTTPException(status_code=500, detail="Erro interno ao excluir histórico.")
 
 @app.put("/api/historico/{id}", tags=["Histórico"])
-async def editar_historico(id: int, payload: PeriodoUpdate):
+async def editar_historico(id: int, payload: PeriodoUpdate, user: dict = Depends(get_current_user)):
     """
     Edita o período de uma conciliação já gravada.
     """
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute("UPDATE conciliacoes SET periodo = ? WHERE id = ?", (payload.periodo, id))
-            if cursor.rowcount == 0:
-                raise HTTPException(status_code=404, detail="Conciliação não encontrada.")
-            conn.commit()
-            return JSONResponse(content={"status": "success", "message": "Período atualizado."})
+        res = supabase_client.table("conciliacoes").update({"periodo": payload.periodo}).eq("id", id).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Conciliação não encontrada.")
+        return JSONResponse(content={"status": "success", "message": "Período atualizado."})
     except HTTPException:
         raise
     except Exception as exc:
         logger.error(f"Erro ao editar histórico {id}: {exc}")
         raise HTTPException(status_code=500, detail="Erro interno ao tentar atualizar o histórico.")
+
+@app.put("/api/historico/{id}/anotacao", tags=["Histórico"])
+async def editar_anotacao(id: int, payload: AnotacaoUpdate, user: dict = Depends(get_current_user)):
+    """
+    Edita a anotação de uma conciliação.
+    """
+    try:
+        res = supabase_client.table("conciliacoes").update({"anotacao": payload.anotacao}).eq("id", id).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Conciliação não encontrada.")
+        return JSONResponse(content={"status": "success", "message": "Anotação atualizada."})
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Erro ao editar anotação {id}: {exc}")
+        raise HTTPException(status_code=500, detail="Erro interno ao tentar atualizar a anotação.")
 
 # ---------------------------------------------------------------------------
 # Endpoint de Health Check

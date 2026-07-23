@@ -11,6 +11,7 @@
   <script src="https://unpkg.com/@phosphor-icons/web@2.1.1/src/index.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -58,6 +59,12 @@
     .delay-100{animation-delay:.1s} .delay-200{animation-delay:.2s} .delay-300{animation-delay:.3s}
     .delay-400{animation-delay:.4s} .delay-500{animation-delay:.5s} .delay-600{animation-delay:.6s}
     
+    [contenteditable]:empty:before {
+      content: attr(placeholder);
+      color: #9ca3af;
+      pointer-events: none;
+      display: block;
+    }
   </style>
 </head>
 <body class="min-h-screen bg-[#F8F9FA]">
@@ -73,9 +80,70 @@
     <h1 class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-green-600 font-bold text-xl tracking-wide hidden sm:block">
       Sistema Inteligente de Conciliação
     </h1>
+
+    <button id="btn-logout" onclick="logout()" class="absolute right-0 top-1/2 -translate-y-1/2 text-gray-500 hover:text-red-500 hidden items-center gap-2 mr-4 sm:mr-8 transition-colors">
+      <i class="ph ph-sign-out text-xl"></i><span class="hidden sm:inline">Sair</span>
+    </button>
   </div>
 </header>
 
+<!-- LOGIN VIEW -->
+<div id="view-login" class="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] hidden animate-[fadeIn_0.4s_ease-out_both]">
+  <div class="bg-white p-8 rounded-2xl shadow-card w-full max-w-md border border-gray-100">
+    <div class="text-center mb-8">
+      <h2 id="login-title" class="text-2xl font-bold text-gray-800 mb-2">Acesso Restrito</h2>
+      <p id="login-desc" class="text-gray-500 text-sm">Insira suas credenciais para acessar o sistema.</p>
+    </div>
+    
+    <form id="form-login" onsubmit="handleLogin(event)" class="space-y-5">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">E-mail corporativo</label>
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <i class="ph ph-envelope-simple text-gray-400 text-lg"></i>
+          </div>
+          <input type="email" id="login-email" required class="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#038201] focus:border-[#038201] transition-shadow text-sm" placeholder="usuario@carrilho.com">
+        </div>
+      </div>
+
+      <div id="div-password">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <i class="ph ph-lock-key text-gray-400 text-lg"></i>
+          </div>
+          <input type="password" id="login-password" required class="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#038201] focus:border-[#038201] transition-shadow text-sm" placeholder="••••••••">
+        </div>
+      </div>
+
+      <div id="div-new-password" class="hidden">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Nova Senha</label>
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <i class="ph ph-lock-key text-gray-400 text-lg"></i>
+          </div>
+          <input type="password" id="login-new-password" class="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#038201] focus:border-[#038201] transition-shadow text-sm" placeholder="Sua nova senha">
+        </div>
+      </div>
+
+      <div id="login-error" class="hidden bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center border border-red-100"></div>
+      <div id="login-success" class="hidden bg-green-50 text-green-600 p-3 rounded-lg text-sm text-center border border-green-100"></div>
+
+      <button type="submit" id="btn-login-submit" class="w-full bg-[#038201] hover:bg-[#026901] text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-green-600/20 transition-all duration-200 flex justify-center items-center gap-2">
+        <span>Entrar</span>
+        <i class="ph ph-arrow-right text-lg"></i>
+      </button>
+
+      <div class="text-center mt-4">
+        <button type="button" id="btn-toggle-password" onclick="togglePasswordMode()" class="text-sm text-[#038201] hover:underline bg-transparent border-none cursor-pointer">
+          Quero alterar minha senha
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="app-content" class="hidden">
 <!-- NAV TABS -->
 <nav class="bg-white border-b border-gray-200">
   <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -278,7 +346,7 @@
     </div>
 
     <!-- KPI Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
       <div class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.1s_both]">
         <div class="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center mx-auto mb-3"><i class="ph ph-check-circle text-[#038201] text-2xl"></i></div>
         <div id="kpi-perfeito" class="text-3xl font-extrabold text-[#038201] mb-1">—</div>
@@ -296,6 +364,12 @@
         <div id="kpi-desmembrado" class="text-3xl font-extrabold text-purple-500 mb-1">—</div>
         <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">Valores<br/>Desmembrados</div>
         <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 text-purple-500 text-[10px] font-semibold"><i class="ph ph-intersect text-xs"></i>Regra 3</div>
+      </div>
+      <div class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.35s_both]">
+        <div class="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-3"><i class="ph ph-arrow-circle-down text-red-500 text-2xl"></i></div>
+        <div id="kpi-saidas" class="text-3xl font-extrabold text-red-500 mb-1">—</div>
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">Saídas /<br/>Estornos</div>
+        <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-500 text-[10px] font-semibold"><i class="ph ph-funnel text-xs"></i>Regra 4</div>
       </div>
       <div class="bg-white rounded-2xl shadow-card border border-amber-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.4s_both] relative overflow-hidden">
         <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-red-400 rounded-t-2xl"></div>
@@ -316,12 +390,14 @@
         <div class="h-full bg-[#038201] rounded-l-full transition-all duration-700" style="width:0%"></div>
         <div class="h-full bg-blue-400 transition-all duration-700" style="width:0%"></div>
         <div class="h-full bg-purple-400 transition-all duration-700" style="width:0%"></div>
+        <div class="h-full bg-red-400 transition-all duration-700" style="width:0%"></div>
         <div class="h-full bg-amber-400 rounded-r-full transition-all duration-700" style="width:0%"></div>
       </div>
       <div class="legenda-dist flex flex-wrap gap-4 mt-3">
         <div class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-[#038201] flex-shrink-0"></span><span>Perfeitos</span></div>
         <div class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-blue-400 flex-shrink-0"></span><span>Via Histórico</span></div>
         <div class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-purple-400 flex-shrink-0"></span><span>Desmembrados</span></div>
+        <div class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-red-400 flex-shrink-0"></span><span>Saídas/Estornos</span></div>
         <div class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0"></span><span>Divergências</span></div>
       </div>
     </div>
@@ -417,6 +493,70 @@
     <button onclick="hideToast()" class="ml-auto text-gray-300 hover:text-gray-500 transition-colors">
       <i class="ph ph-x text-sm"></i>
     </button>
+  </div>
+</div>
+
+<!-- MODAL DE ANOTAÇÃO -->
+<div id="modal-anotacao" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onclick="fecharModalAnotacao()"></div>
+  <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-[slideUp_0.3s_ease-out_both]">
+    
+    <div class="flex items-center justify-between p-6 border-b border-gray-100">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500">
+          <i class="ph ph-notebook text-xl"></i>
+        </div>
+        <div>
+          <h2 class="text-lg font-bold text-gray-800">Anotações da Conciliação</h2>
+          <p id="modal-anotacao-periodo" class="text-xs text-gray-400 font-medium">Período: 01/06 a 30/06</p>
+        </div>
+      </div>
+      <button onclick="fecharModalAnotacao()" class="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-lg hover:bg-gray-50">
+        <i class="ph ph-x text-lg"></i>
+      </button>
+    </div>
+
+    <div class="p-6 flex-1 overflow-y-auto bg-gray-50/50">
+      <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden flex flex-col h-64">
+        <!-- Toolbar -->
+        <div class="flex items-center gap-2 p-2 border-b border-gray-100 bg-gray-50">
+          <button type="button" onclick="formatarAnotacao('hiliteColor', '#fef08a')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-gray-600 hover:text-amber-500 transition-all" title="Grifar (Amarelo)">
+            <i class="ph ph-highlighter-circle text-lg"></i>
+          </button>
+          <div class="w-px h-5 bg-gray-200 mx-1"></div>
+          <button type="button" onclick="formatarAnotacao('foreColor', '#ef4444')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-red-500 transition-all" title="Texto Vermelho">
+            <i class="ph ph-text-aa text-lg"></i>
+          </button>
+          <button type="button" onclick="formatarAnotacao('foreColor', '#22c55e')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-green-500 transition-all" title="Texto Verde">
+            <i class="ph ph-text-aa text-lg"></i>
+          </button>
+          <button type="button" onclick="formatarAnotacao('foreColor', '#3b82f6')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-blue-500 transition-all" title="Texto Azul">
+            <i class="ph ph-text-aa text-lg"></i>
+          </button>
+          <div class="w-px h-5 bg-gray-200 mx-1"></div>
+          <button type="button" onclick="formatarAnotacao('removeFormat')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-gray-400 hover:text-gray-600 transition-all" title="Remover Formatação">
+            <i class="ph ph-eraser text-lg"></i>
+          </button>
+        </div>
+        <!-- Editor -->
+        <div id="editor-anotacao" contenteditable="true" class="flex-1 p-4 outline-none text-sm text-gray-700 overflow-y-auto" placeholder="Escreva suas anotações, observações ou problemas desta conciliação aqui..."></div>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between p-6 border-t border-gray-100 bg-white rounded-b-3xl">
+      <button onclick="limparAnotacao()" class="text-sm font-semibold text-red-500 hover:text-red-600 px-4 py-2 rounded-xl hover:bg-red-50 transition-colors">
+        Excluir
+      </button>
+      <div class="flex items-center gap-3">
+        <button onclick="fecharModalAnotacao()" class="px-6 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:border-gray-300 transition-colors">
+          Cancelar
+        </button>
+        <button onclick="salvarAnotacao()" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#038201] text-white font-bold text-sm shadow-[0_4px_12px_rgba(3,130,1,0.25)] hover:bg-[#026901] transition-all">
+          <i class="ph ph-floppy-disk text-lg"></i>
+          Salvar Anotação
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -591,11 +731,12 @@
         perfeitos:    Number(res.perfeitos    ?? 0),
         historico:    Number(res.historico    ?? 0),
         desmembrados: Number(res.desmembrados ?? 0),
+        saidas_estornos: Number(res.saidas_estornos ?? 0),
         divergencias: Number(res.divergencias ?? 0),
       };
 
       // Cálculo da porcentagem conforme especificação
-      const sucesso = _resultados.perfeitos + _resultados.historico + _resultados.desmembrados;
+      const sucesso = _resultados.perfeitos + _resultados.historico + _resultados.desmembrados + _resultados.saidas_estornos;
       const totalCalcFetch = sucesso + _resultados.divergencias;
       const percentagem = totalCalcFetch > 0
         ? Math.round((sucesso / totalCalcFetch) * 100)
@@ -649,11 +790,12 @@
 
     console.log('[KPI] Preenchendo cartões:', res, '| Pct:', percentagem, '| Total:', total);
 
-    // 1. Preenche os 4 cartões com valores numéricos garantidos
+    // 1. Preenche os 5 cartões com valores numéricos garantidos
     const mapa = [
       { campo: 'perfeitos',     id: 'kpi-perfeito'     },
       { campo: 'historico',     id: 'kpi-historico'    },
       { campo: 'desmembrados',  id: 'kpi-desmembrado'  },
+      { campo: 'saidas_estornos',id: 'kpi-saidas'      },
       { campo: 'divergencias',  id: 'kpi-divergencias' },
     ];
     mapa.forEach(({ campo, id }) => {
@@ -682,30 +824,34 @@
     const perfeitos    = res.perfeitos    || 0;
     const historico    = res.historico    || 0;
     const desmembrados = res.desmembrados || 0;
+    const saidas       = res.saidas_estornos || 0;
     const divergencias = res.divergencias || 0;
-    const totalCalc    = perfeitos + historico + desmembrados + divergencias;
+    const totalCalc    = perfeitos + historico + desmembrados + saidas + divergencias;
 
     if (totalCalc > 0) {
       const pPerf = ((perfeitos    / totalCalc) * 100).toFixed(1);
       const pHist = ((historico    / totalCalc) * 100).toFixed(1);
       const pDesm = ((desmembrados / totalCalc) * 100).toFixed(1);
+      const pSaid = ((saidas       / totalCalc) * 100).toFixed(1);
       const pDiv  = ((divergencias / totalCalc) * 100).toFixed(1);
 
       const bars = document.querySelectorAll('#barra-dist > div');
-      if (bars.length === 4) {
+      if (bars.length === 5) {
         bars[0].style.width = pPerf + '%'; bars[0].title = `Perfeitos: ${perfeitos} (${pPerf}%)`;
         bars[1].style.width = pHist + '%'; bars[1].title = `Via Histórico: ${historico} (${pHist}%)`;
         bars[2].style.width = pDesm + '%'; bars[2].title = `Desmembrados: ${desmembrados} (${pDesm}%)`;
-        bars[3].style.width = pDiv  + '%'; bars[3].title = `Divergências: ${divergencias} (${pDiv}%)`;
+        bars[3].style.width = pSaid + '%'; bars[3].title = `Saídas/Estornos: ${saidas} (${pSaid}%)`;
+        bars[4].style.width = pDiv  + '%'; bars[4].title = `Divergências: ${divergencias} (${pDiv}%)`;
       }
 
       // Atualiza os textos de legenda (spans de texto, não os círculos coloridos)
       const legs = document.querySelectorAll('.legenda-dist > div > span:last-child');
-      if (legs.length === 4) {
+      if (legs.length === 5) {
         legs[0].textContent = `Perfeitos (${pPerf}%)`;
         legs[1].textContent = `Via Histórico (${pHist}%)`;
         legs[2].textContent = `Desmembrados (${pDesm}%)`;
-        legs[3].textContent = `Divergências (${pDiv}%)`;
+        legs[3].textContent = `Saídas/Estornos (${pSaid}%)`;
+        legs[4].textContent = `Divergências (${pDiv}%)`;
       }
     }
   }
@@ -831,11 +977,14 @@
     if (chartsContainer) chartsContainer.classList.remove('hidden');
     if (emptyState) emptyState.classList.add('hidden');
 
+    window.historicoData = data; // Armazena globalmente para usar nas anotações
+
     // Popula a tabela
     tbody.innerHTML = data.map(row => {
       const d = new Date(row.data_processamento);
       const dataFormatada = d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-      const conciliados = row.perfeitos + row.historico + row.desmembrados;
+      const saidas = row.saidas_estornos || 0;
+      const conciliados = row.perfeitos + row.historico + row.desmembrados + saidas;
       const sucesso = (row.taxa_sucesso || 0).toFixed(1);
       return `
         <tr class="hover:bg-gray-50 transition-colors">
@@ -866,7 +1015,10 @@
           </td>
           <td class="py-4 px-6 text-right">
             <div class="flex items-center justify-end gap-2">
-              <button onclick="visualizarHistorico(${row.id}, ${row.perfeitos}, ${row.historico}, ${row.desmembrados}, ${row.divergencias}, ${row.taxa_sucesso}, '${esc(row.periodo || '')}')" class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all shadow-sm group" title="Visualizar Detalhes">
+              <button onclick="abrirModalAnotacao(${row.id})" class="inline-flex items-center justify-center w-9 h-9 rounded-xl ${row.anotacao ? 'bg-amber-100 text-amber-600 hover:bg-amber-500' : 'bg-gray-50 text-gray-400 hover:bg-amber-500'} hover:text-white transition-all shadow-sm group" title="Anotações">
+                <i class="ph ph-notebook text-lg transition-transform group-hover:-translate-y-0.5"></i>
+              </button>
+              <button onclick="visualizarHistorico(${row.id}, ${row.perfeitos}, ${row.historico}, ${row.desmembrados}, ${saidas}, ${row.divergencias}, ${row.taxa_sucesso}, '${esc(row.periodo || '')}')" class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all shadow-sm group" title="Visualizar Detalhes">
                 <i class="ph ph-eye text-lg transition-transform group-hover:-translate-y-0.5"></i>
               </button>
               <a href="${API_BASE}/api/download/${row.id}" download class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-green-50 text-[#038201] hover:bg-[#038201] hover:text-white transition-all shadow-sm group" title="Baixar Arquivo Morto">
@@ -885,7 +1037,7 @@
     const ultimos = data.slice(0, 10).reverse();
     const labels = ultimos.map(r => r.periodo || 'Desconhecido');
     const taxas = ultimos.map(r => r.taxa_sucesso || 0);
-    const conciliaArr = ultimos.map(r => r.perfeitos + r.historico + r.desmembrados);
+    const conciliaArr = ultimos.map(r => r.perfeitos + r.historico + r.desmembrados + (r.saidas_estornos || 0));
     const divArr = ultimos.map(r => r.divergencias);
 
     // Gráfico 1: Linha
@@ -979,19 +1131,20 @@
     }
   }
 
-  function visualizarHistorico(id, perfeitos, historico, desmembrados, divergencias, taxa_sucesso, periodo) {
+  function visualizarHistorico(id, perfeitos, historico, desmembrados, saidas_estornos, divergencias, taxa_sucesso, periodo) {
     _currentId = id;
     _currentPeriodo = periodo || 'Desconhecido';
     _resultados = {
        perfeitos: perfeitos,
        historico: historico,
        desmembrados: desmembrados,
+       saidas_estornos: saidas_estornos,
        divergencias: divergencias
     };
     _excelBlob = null; 
     
     document.getElementById('periodo-text').textContent = _currentPeriodo;
-    const totalCalc = perfeitos + historico + desmembrados + divergencias;
+    const totalCalc = perfeitos + historico + desmembrados + saidas_estornos + divergencias;
     _preencherResultados(_resultados, taxa_sucesso, totalCalc);
     
     document.getElementById('tab-nova').className = 'border-b-2 border-[#038201] text-[#038201] py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none';
@@ -1032,6 +1185,213 @@
       showToast('Erro', 'Não foi possível atualizar o período.', 'error');
     }
   }
+
+  // ==========================================
+  // LÓGICA DO MODAL DE ANOTAÇÕES
+  // ==========================================
+  let _currentAnotacaoId = null;
+
+  function abrirModalAnotacao(id) {
+    const row = window.historicoData.find(r => r.id === id);
+    if (!row) return;
+
+    _currentAnotacaoId = id;
+    document.getElementById('modal-anotacao-periodo').textContent = 'Período: ' + (row.periodo || 'Desconhecido');
+    document.getElementById('editor-anotacao').innerHTML = row.anotacao || '';
+    
+    document.getElementById('modal-anotacao').classList.remove('hidden');
+    document.getElementById('editor-anotacao').focus();
+  }
+
+  function fecharModalAnotacao() {
+    document.getElementById('modal-anotacao').classList.add('hidden');
+    _currentAnotacaoId = null;
+  }
+
+  function formatarAnotacao(comando, valor = null) {
+    document.execCommand(comando, false, valor);
+    document.getElementById('editor-anotacao').focus();
+  }
+
+  async function salvarAnotacao() {
+    if (!_currentAnotacaoId) return;
+    const conteudo = document.getElementById('editor-anotacao').innerHTML;
+    
+    try {
+      const resp = await fetch(API_BASE + '/api/historico/' + _currentAnotacaoId + '/anotacao', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ anotacao: conteudo })
+      });
+      if (!resp.ok) throw new Error('Falha ao salvar anotação.');
+      
+      showToast('Sucesso', 'Anotação salva com sucesso.', 'success');
+      fecharModalAnotacao();
+      fetchHistorico();
+    } catch(err) {
+      console.error(err);
+      showToast('Erro', 'Não foi possível salvar a anotação.', 'error');
+    }
+  }
+
+  async function limparAnotacao() {
+    if (!_currentAnotacaoId) return;
+    if(!confirm("Deseja realmente apagar esta anotação?")) return;
+    
+    try {
+      const resp = await fetch(API_BASE + '/api/historico/' + _currentAnotacaoId + '/anotacao', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ anotacao: '' })
+      });
+      if (!resp.ok) throw new Error('Falha ao excluir anotação.');
+      
+      showToast('Sucesso', 'Anotação excluída.', 'success');
+      fecharModalAnotacao();
+      fetchHistorico();
+    } catch(err) {
+      console.error(err);
+      showToast('Erro', 'Não foi possível excluir a anotação.', 'error');
+    }
+  }
+
+  // ==========================================
+  // SUPABASE AUTH LÓGICA
+  // ==========================================
+  const SUPABASE_URL = 'https://lhplusbyrbdaszsknkmo.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxocGx1c2J5cmJkYXN6c2tua21vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NDIyNDgsImV4cCI6MjEwMDMxODI0OH0.0sSNrN7ShD3XuzQgZTlSq9zsHGR7XVGyPVnBkOa-DqM';
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  window.supabaseSession = null;
+  let isChangingPassword = false;
+
+  // Interceptar Fetch para injetar Token JWT
+  const originalFetch = window.fetch;
+  window.fetch = async function() {
+    let [resource, config] = arguments;
+    if(config === undefined) { config = {}; }
+    if(config.headers === undefined) { config.headers = {}; }
+    
+    // Se FormData, fetch já decide o Content-Type sozinho se omitido, mas injetamos o token em Headers
+    if (config.headers instanceof Headers) {
+      if (window.supabaseSession) config.headers.append('Authorization', 'Bearer ' + window.supabaseSession.access_token);
+    } else {
+      if (window.supabaseSession) config.headers['Authorization'] = 'Bearer ' + window.supabaseSession.access_token;
+    }
+    
+    const response = await originalFetch(resource, config);
+    if (response.status === 401) {
+      // Token expirou ou é inválido
+      logout();
+    }
+    return response;
+  };
+
+  async function checkSession() {
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
+    if (session) {
+      window.supabaseSession = session;
+      document.getElementById('view-login').classList.add('hidden');
+      document.getElementById('app-content').classList.remove('hidden');
+      document.getElementById('btn-logout').classList.remove('hidden');
+      document.getElementById('btn-logout').classList.add('flex');
+    } else {
+      window.supabaseSession = null;
+      document.getElementById('app-content').classList.add('hidden');
+      document.getElementById('view-login').classList.remove('hidden');
+      document.getElementById('btn-logout').classList.add('hidden');
+      document.getElementById('btn-logout').classList.remove('flex');
+    }
+  }
+
+  function togglePasswordMode() {
+    isChangingPassword = !isChangingPassword;
+    const divNewPwd = document.getElementById('div-new-password');
+    const btnSubmit = document.getElementById('btn-login-submit');
+    const btnToggle = document.getElementById('btn-toggle-password');
+    const loginTitle = document.getElementById('login-title');
+    const loginDesc = document.getElementById('login-desc');
+
+    if (isChangingPassword) {
+      divNewPwd.classList.remove('hidden');
+      document.getElementById('login-new-password').required = true;
+      btnSubmit.innerHTML = '<span>Alterar Senha</span><i class="ph ph-check-circle text-lg"></i>';
+      btnToggle.textContent = 'Voltar para login normal';
+      loginTitle.textContent = 'Alterar Senha';
+      loginDesc.textContent = 'Insira sua senha atual e a nova senha desejada.';
+    } else {
+      divNewPwd.classList.add('hidden');
+      document.getElementById('login-new-password').required = false;
+      document.getElementById('login-new-password').value = '';
+      btnSubmit.innerHTML = '<span>Entrar</span><i class="ph ph-arrow-right text-lg"></i>';
+      btnToggle.textContent = 'Quero alterar minha senha';
+      loginTitle.textContent = 'Acesso Restrito';
+      loginDesc.textContent = 'Insira suas credenciais para acessar o sistema.';
+    }
+    document.getElementById('login-error').classList.add('hidden');
+    document.getElementById('login-success').classList.add('hidden');
+  }
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    const newPassword = document.getElementById('login-new-password').value;
+    
+    const errorDiv = document.getElementById('login-error');
+    const successDiv = document.getElementById('login-success');
+    errorDiv.classList.add('hidden');
+    successDiv.classList.add('hidden');
+    
+    const btn = document.getElementById('btn-login-submit');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i>';
+    btn.disabled = true;
+
+    try {
+      // 1. Fazer login normal para autenticar (necessário até para trocar a senha)
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
+
+      if (error) throw error;
+
+      if (isChangingPassword) {
+        // Atualizar senha
+        const { error: updateError } = await supabaseClient.auth.updateUser({ password: newPassword });
+        if (updateError) throw updateError;
+        
+        successDiv.textContent = 'Senha atualizada com sucesso! Você já pode entrar.';
+        successDiv.classList.remove('hidden');
+        
+        // Fazer logout para obrigar entrar com a senha nova, ou apenas manter logado.
+        // Optamos por fazer logout para forçar login normal com senha nova:
+        await supabaseClient.auth.signOut();
+        togglePasswordMode(); // Volta pra tela de login
+        document.getElementById('login-password').value = '';
+      } else {
+        // Fluxo de login normal
+        await checkSession();
+      }
+    } catch (err) {
+      console.error(err);
+      errorDiv.textContent = err.message === 'Invalid login credentials' ? 'Usuário ou senha incorretos.' : err.message;
+      errorDiv.classList.remove('hidden');
+    } finally {
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    }
+  }
+
+  async function logout() {
+    await supabaseClient.auth.signOut();
+    await checkSession();
+  }
+
+  // Verifica a sessão ao carregar a página
+  window.addEventListener('DOMContentLoaded', checkSession);
+
 </script>
+</div>
 </body>
 </html>

@@ -4,11 +4,23 @@
 
 temp_*/
 temp_uploads/
+arquivos_antigos/
 
-pycache/
+__pycache__/
 *.pyc
 .DS_Store
 
 venv/
 env/
 .env
+
+# Arquivos locais e de desenvolvimento
+historico.db
+scratch/
+debug_*.py
+migrate.py
+test.py
+run_conciliacao.py
+implementation_plan.md
+task.md
+walkthrough.md
