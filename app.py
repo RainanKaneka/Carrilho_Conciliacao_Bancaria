@@ -143,7 +143,12 @@ if _FRONTEND_PATH.exists():
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     async def serve_frontend():
         """Serve o front-end (index.html) na raiz do servidor."""
-        return HTMLResponse(content=_FRONTEND_PATH.read_text(encoding="utf-8"))
+        headers = {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+        return HTMLResponse(content=_FRONTEND_PATH.read_text(encoding="utf-8"), headers=headers)
 
 # ---------------------------------------------------------------------------
 # Pasta base para uploads temporários
