@@ -412,6 +412,44 @@ class ReconciliationEngine:
         remover_matched(m_a, m_b)
 
         # ==========================================
+        # REGRA 0.5: CONCILIADO POR NOME (Nome do cliente no histórico do banco)
+        # ==========================================
+        m_a, m_b = [], []
+        col_cliente = 'CLIENTES' if 'CLIENTES' in argos_pendentes.columns else 'Cliente'
+        
+        for i, row_a in argos_pendentes.iterrows():
+            cliente_str = str(row_a.get(col_cliente, '')).strip().upper()
+            if not cliente_str or cliente_str == 'CLIENTE NÃO INFORMADO':
+                continue
+                
+            # Extrair palavras principais do nome do cliente (com mais de 2 letras)
+            palavras_nome = [p for p in cliente_str.split() if len(p) > 2]
+            if len(palavras_nome) < 2:
+                continue
+                
+            candidatos = bank_pendentes[(bank_pendentes['Valor'] == row_a['Valor']) & (~bank_pendentes['ID_Bank'].isin(m_b))].copy()
+            if not candidatos.empty:
+                diff_dias = abs((pd.to_datetime(row_a['Data'], format='%d/%m/%Y', errors='coerce') - 
+                               pd.to_datetime(candidatos['Data'], format='%d/%m/%Y', errors='coerce')).dt.days)
+                candidatos['diff_dias'] = diff_dias
+                candidatos = candidatos.sort_values(by='diff_dias')
+                
+                for j, row_b in candidatos.iterrows():
+                    hist_banco = str(row_b.get('Histórico', '')).upper()
+                    
+                    # Verifica se as duas primeiras palavras do nome estão no histórico
+                    if palavras_nome[0] in hist_banco and palavras_nome[1] in hist_banco:
+                        if pd.isna(row_b['diff_dias']) or row_b['diff_dias'] <= 31:
+                            nota = row_a.to_dict().copy()
+                            nota['Baixas'] = row_b['Banco']
+                            nota['Data Baixa'] = row_b['Data']
+                            resultados['1_Conciliado_Perfeito'].append(nota)
+                            m_a.append(row_a['ID_Argos'])
+                            m_b.append(row_b['ID_Bank'])
+                            break
+        remover_matched(m_a, m_b)
+
+        # ==========================================
         # REGRA 1.1: MATCH PERFEITO ÚNICO (Sem limite de datas)
         # ==========================================
         m_a, m_b = [], []
