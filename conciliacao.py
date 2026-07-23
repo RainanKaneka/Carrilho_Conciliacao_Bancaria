@@ -318,7 +318,13 @@ class ReconciliationEngine:
             # Isso evita extrair uma data (ex: "15/06" virar R$ 15,06 e roubar depósitos)
             palavras_dinheiro = ['pix', 'valor', 'reais', 'r$', 'pago', 'restante', 'baixa', 'comprovante']
             if match and not any(p in texto_hist_corrigido.lower() for p in palavras_dinheiro):
-                match = None
+                val_str_temp = match.group(1).replace('.', '').replace(',', '.')
+                try: 
+                    v_temp = float(val_str_temp)
+                    if abs(v_temp - row_a['Valor']) > 15.0:
+                        match = None
+                except:
+                    match = None
 
             if match:
                 val_str = match.group(1).replace('.', '').replace(',', '.')
@@ -345,7 +351,7 @@ class ReconciliationEngine:
                     candidatos = candidatos.sort_values(by='diff_dias')
                     
                     for j, row_b in candidatos.iterrows():
-                        if pd.notna(row_b['diff_dias']) and row_b['diff_dias'] <= 7: 
+                        if pd.isna(row_b['diff_dias']) or row_b['diff_dias'] <= 31: 
                             valor_faltante = round(v_regex - row_a['Valor'], 2)
                             comb_encontrada = []
                             
@@ -427,7 +433,7 @@ class ReconciliationEngine:
             if len(palavras_nome) < 2:
                 continue
                 
-            candidatos = bank_pendentes[(bank_pendentes['Valor'] == row_a['Valor']) & (~bank_pendentes['ID_Bank'].isin(m_b))].copy()
+            candidatos = bank_pendentes[(abs(bank_pendentes['Valor'] - row_a['Valor']) <= 1.50) & (~bank_pendentes['ID_Bank'].isin(m_b))].copy()
             if not candidatos.empty:
                 diff_dias = abs((pd.to_datetime(row_a['Data'], format='%d/%m/%Y', errors='coerce') - 
                                pd.to_datetime(candidatos['Data'], format='%d/%m/%Y', errors='coerce')).dt.days)
@@ -443,6 +449,12 @@ class ReconciliationEngine:
                             nota = row_a.to_dict().copy()
                             nota['Baixas'] = row_b['Banco']
                             nota['Data Baixa'] = row_b['Data']
+                            
+                            diff_valor = round(row_b['Valor'] - row_a['Valor'], 2)
+                            if diff_valor != 0:
+                                sinal = "+" if diff_valor > 0 else ""
+                                nota['Motivo Divergência'] = f'Aproximação de Centavos ({sinal}R$ {diff_valor})'
+                                
                             resultados['1_Conciliado_Perfeito'].append(nota)
                             m_a.append(row_a['ID_Argos'])
                             m_b.append(row_b['ID_Bank'])
