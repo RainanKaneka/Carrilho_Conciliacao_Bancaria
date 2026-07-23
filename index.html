@@ -889,8 +889,7 @@
   function triggerDownload() {
     if (!_excelBlob) {
       if (_currentId) {
-        window.location.href = API_BASE + '/api/download/' + _currentId;
-        showToast('Download iniciado!', 'Baixando planilha do histórico.', 'success');
+        downloadHistorico(_currentId);
       } else {
         showToast('Arquivo indisponível', 'Execute a conciliação primeiro.', 'warning');
       }
@@ -906,6 +905,44 @@
     document.body.removeChild(a);   // remove o elemento do DOM imediatamente
     URL.revokeObjectURL(url);       // libera memória do Object URL
     showToast('Download iniciado!', 'Conciliacao_Final.xlsx foi salvo com sucesso.', 'success');
+  }
+
+  async function downloadHistorico(id) {
+    showToast('Aguarde...', 'Preparando o download do arquivo.', 'info');
+    try {
+      // Usamos fetch normal, que cai no nosso interceptador e adiciona o token Bearer
+      const response = await fetch(API_BASE + '/api/download/' + id);
+      
+      if (!response.ok) {
+        throw new Error('Não foi possível baixar o arquivo.');
+      }
+      
+      // Extrai o Blob da resposta
+      const blob = await response.blob();
+      
+      // Tenta obter o nome do arquivo a partir dos cabeçalhos, se possível
+      let filename = 'Conciliacao_Historico.xlsx';
+      const disposition = response.headers.get('content-disposition');
+      if (disposition && disposition.indexOf('filename=') !== -1) {
+        const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+        if (matches != null && matches[1]) { 
+          filename = matches[1].replace(/['"]/g, '');
+        }
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      showToast('Sucesso!', 'Download concluído.', 'success');
+    } catch(err) {
+      showToast('Erro no download', err.message, 'error');
+    }
   }
 
   let toastTimer=null;
@@ -1021,9 +1058,9 @@
               <button onclick="visualizarHistorico(${row.id}, ${row.perfeitos}, ${row.historico}, ${row.desmembrados}, ${saidas}, ${row.divergencias}, ${row.taxa_sucesso}, '${esc(row.periodo || '')}')" class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all shadow-sm group" title="Visualizar Detalhes">
                 <i class="ph ph-eye text-lg transition-transform group-hover:-translate-y-0.5"></i>
               </button>
-              <a href="${API_BASE}/api/download/${row.id}" download class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-green-50 text-[#038201] hover:bg-[#038201] hover:text-white transition-all shadow-sm group" title="Baixar Arquivo Morto">
+              <button onclick="downloadHistorico(${row.id})" class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-green-50 text-[#038201] hover:bg-[#038201] hover:text-white transition-all shadow-sm group" title="Baixar Arquivo Morto">
                 <i class="ph ph-download-simple text-lg transition-transform group-hover:-translate-y-0.5"></i>
-              </a>
+              </button>
               <button onclick="excluirHistorico(${row.id})" class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-sm group" title="Excluir Histórico">
                 <i class="ph ph-trash text-lg transition-transform group-hover:-translate-y-0.5"></i>
               </button>
