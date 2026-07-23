@@ -638,8 +638,9 @@ class ExcelReporter:
                 df = df.rename(columns=mapa_colunas)
                 colunas_finais = [c for c in ordem_desejada if c in df.columns]
                 df = df[colunas_finais]
+                df['OBSERVAÇÃO'] = ''
             else:
-                df = pd.DataFrame(columns=[c for c in ordem_desejada if c != 'MOTIVO DIVERGÊNCIA'])
+                df = pd.DataFrame(columns=[c for c in ordem_desejada if c != 'MOTIVO DIVERGÊNCIA'] + ['OBSERVAÇÃO'])
             
             formatted_sheets[novo_nome_aba] = df
 
@@ -772,6 +773,8 @@ class ExcelReporter:
                         worksheet.column_dimensions[col_letter].width = max(max_length + 6, 20)
                     elif 'DATA' in col_name:
                         worksheet.column_dimensions[col_letter].width = max(max_length + 2, 23)
+                    elif col_name == 'OBSERVAÇÃO':
+                        worksheet.column_dimensions[col_letter].width = 40
                     else:
                         worksheet.column_dimensions[col_letter].width = min(max_length + 2, 50)
 
