@@ -636,8 +636,8 @@
     }
   }
 
-  // URL base da API — quando servido pelo app.py usa rota relativa
-  const API_BASE = window.location.port === '8000' ? '' : 'http://localhost:8000';
+  // URL base da API — usa rota relativa para funcionar tanto localmente quanto no Render
+  const API_BASE = '';
 
   const STEPS = [
     {pct:15, label:'Enviando arquivos para o servidor...'},
