@@ -544,6 +544,32 @@ async def baixar_arquivo_antigo(id: int, user: dict = Depends(get_current_user))
         logger.error(f"Erro ao baixar arquivo {id}: {exc}")
         raise HTTPException(status_code=500, detail="Erro interno ao processar o download.")
 
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[int]
+
+@app.delete("/api/historico/bulk", tags=["Histórico"])
+async def excluir_historico_bulk(request: BulkDeleteRequest, user: dict = Depends(get_current_user)):
+    try:
+        if not request.ids:
+            return {"message": "Nenhum ID fornecido."}
+            
+        res = supabase_client.table("conciliacoes").select("caminho_arquivo").in_("id", request.ids).execute()
+        
+        file_names = [row["caminho_arquivo"] for row in res.data if row.get("caminho_arquivo")]
+        
+        if file_names:
+            try:
+                supabase_client.storage.from_("arquivos_antigos").remove(file_names)
+            except Exception as exc:
+                logger.warning(f"Não foi possível remover arquivos no Storage: {exc}")
+                
+        supabase_client.table("conciliacoes").delete().in_("id", request.ids).execute()
+        return {"message": "Históricos excluídos com sucesso"}
+    except Exception as exc:
+        logger.error(f"Erro ao excluir histórico em massa: {exc}")
+        raise HTTPException(status_code=500, detail="Erro interno ao excluir históricos em massa.")
+
 @app.delete("/api/historico/{id}", tags=["Histórico"])
 async def excluir_historico(id: int, user: dict = Depends(get_current_user)):
     """

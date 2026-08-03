@@ -704,7 +704,7 @@ class ExcelReporter:
                     if 'DATA' in col.upper():
                         df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce').dt.strftime('%d/%m/%Y').replace('NaT', '')
 
-                df.to_excel(writer, sheet_name=sheet_name, index=False, startrow=4)
+                df.to_excel(writer, sheet_name=sheet_name, index=False, startrow=0)
                 worksheet = writer.sheets[sheet_name]
 
                 header_fill = PatternFill(start_color='266C40', end_color='266C40', fill_type='solid')
@@ -721,51 +721,16 @@ class ExcelReporter:
                     bottom=Side(border_style='thin', color='356A1C')
                 )
 
-                col_indices = {str(worksheet.cell(row=5, column=i).value).upper(): i for i in range(1, worksheet.max_column + 1)}
+                col_indices = {str(worksheet.cell(row=1, column=i).value).upper(): i for i in range(1, worksheet.max_column + 1)}
                 max_col = worksheet.max_column
 
-                for r in range(1, 5):
-                    for c in range(1, max_col + 1):
-                        worksheet.cell(row=r, column=c).fill = fill_verde_claro
-                
-                worksheet.row_dimensions[1].height = 12
-                worksheet.row_dimensions[2].height = 55
-                worksheet.row_dimensions[3].height = 12
-                worksheet.row_dimensions[4].height = 12
-
-                try:
-                    from openpyxl.drawing.image import Image as ExcelImage
-                    from PIL import Image as PILImage
-                    import glob
-                    imagens = glob.glob("img/*.*")
-                    if imagens:
-                        pil_img = PILImage.open(imagens[0])
-                        largura_original, altura_original = pil_img.size
-                        
-                        nova_altura = 65
-                        nova_largura = int((nova_altura / altura_original) * largura_original)
-                        
-                        img = ExcelImage(imagens[0])
-                        img.width = nova_largura
-                        img.height = nova_altura
-                        
-                        if max_col <= 7:
-                            coluna_alvo = 4 
-                        else:
-                            coluna_alvo = 5 
-                            
-                        col_letra_alvo = get_column_letter(max(1, coluna_alvo))
-                        worksheet.add_image(img, f'{col_letra_alvo}2')
-                except Exception as e:
-                    pass
-
-                for cell in worksheet[5]:
+                for cell in worksheet[1]:
                     cell.fill = header_fill
                     cell.font = font_branca_bold
                     cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
                     cell.border = borda_fina
 
-                for row in range(6, worksheet.max_row + 1):
+                for row in range(2, worksheet.max_row + 1):
                     is_zebra = (row % 2 == 0)
 
                     for col_name, col_idx in col_indices.items():
@@ -801,13 +766,13 @@ class ExcelReporter:
                 for col_idx in range(1, max_col + 1):
                     max_length = 0
                     col_letter = get_column_letter(col_idx)
-                    col_name_val = worksheet.cell(row=5, column=col_idx).value
+                    col_name_val = worksheet.cell(row=1, column=col_idx).value
                     if not col_name_val: continue
                     col_name = str(col_name_val).upper()
                     
                     max_length = len(col_name) + 3 
                     
-                    for row_idx in range(5, worksheet.max_row + 1):
+                    for row_idx in range(1, worksheet.max_row + 1):
                         cell = worksheet.cell(row=row_idx, column=col_idx)
                         try:
                             if cell.value:

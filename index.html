@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
+  <link rel="icon" type="image/png" href="/img/carrilho.png">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Conciliação Bancária · Carrilho Distribuidora</title>
   <meta name="description" content="Sistema Inteligente de Conciliação Bancária da Carrilho Distribuidora." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
   <script src="https://unpkg.com/@phosphor-icons/web@2.1.1/src/index.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -32,8 +35,8 @@
             'bounce-soft': 'bounceSoft 1s ease-in-out infinite',
           },
           keyframes: {
-            fadeIn:    { from: { opacity: '0' }, to: { opacity: '1' } },
-            slideUp:   { from: { opacity: '0', transform: 'translateY(24px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+            fadeIn: { from: { opacity: '0' }, to: { opacity: '1' } },
+            slideUp: { from: { opacity: '0', transform: 'translateY(24px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
             pulseRing: { '0%,100%': { transform: 'scale(1)', opacity: '1' }, '50%': { transform: 'scale(1.08)', opacity: '0.7' } },
             bounceSoft: { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-6px)' } },
           },
@@ -46,19 +49,100 @@
     };
   </script>
   <style>
-    * { font-family: 'Poppins', sans-serif; box-sizing: border-box; }
-    body { background-color: #F8F9FA; }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-thumb { background: #038201; border-radius: 8px; }
-    .drop-zone { transition: all 0.2s ease; }
-    .drop-zone.drag-over { border-color: #038201 !important; background-color: #f0fdf0 !important; box-shadow: 0 0 0 4px rgba(3,130,1,0.15); transform: scale(1.01); }
-    .file-tag { animation: fadeIn 0.25s ease-out both; }
-    .dots::after { content: ''; animation: dotDot 1.5s steps(4,end) infinite; }
-    @keyframes dotDot { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} 100%{content:''} }
-    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-    .delay-100{animation-delay:.1s} .delay-200{animation-delay:.2s} .delay-300{animation-delay:.3s}
-    .delay-400{animation-delay:.4s} .delay-500{animation-delay:.5s} .delay-600{animation-delay:.6s}
-    
+    * {
+      font-family: 'Poppins', sans-serif;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: #F8F9FA;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #038201;
+      border-radius: 8px;
+    }
+
+    .drop-zone {
+      transition: all 0.2s ease;
+    }
+
+    .drop-zone.drag-over {
+      border-color: #038201 !important;
+      background-color: #f0fdf0 !important;
+      box-shadow: 0 0 0 4px rgba(3, 130, 1, 0.15);
+      transform: scale(1.01);
+    }
+
+    .file-tag {
+      animation: fadeIn 0.25s ease-out both;
+    }
+
+    .dots::after {
+      content: '';
+      animation: dotDot 1.5s steps(4, end) infinite;
+    }
+
+    @keyframes dotDot {
+      0% {
+        content: ''
+      }
+
+      25% {
+        content: '.'
+      }
+
+      50% {
+        content: '..'
+      }
+
+      75% {
+        content: '...'
+      }
+
+      100% {
+        content: ''
+      }
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0
+      }
+
+      to {
+        opacity: 1
+      }
+    }
+
+    .delay-100 {
+      animation-delay: .1s
+    }
+
+    .delay-200 {
+      animation-delay: .2s
+    }
+
+    .delay-300 {
+      animation-delay: .3s
+    }
+
+    .delay-400 {
+      animation-delay: .4s
+    }
+
+    .delay-500 {
+      animation-delay: .5s
+    }
+
+    .delay-600 {
+      animation-delay: .6s
+    }
+
     [contenteditable]:empty:before {
       content: attr(placeholder);
       color: #9ca3af;
@@ -67,544 +151,658 @@
     }
   </style>
 </head>
+
 <body class="min-h-screen bg-[#F8F9FA]">
 
-<!-- HEADER -->
-<header class="sticky top-0 z-50 bg-[white] shadow-md">
-  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center relative">
-    <!-- Logomarca (Esquerda) -->
-     <a href="/"><img src="./img/carrilho.png" alt="Logo Carrilho" class="h-12 w-auto object-contain" /></a>
-    
+  <!-- HEADER -->
+  <header class="sticky top-0 z-50 bg-[white] shadow-md">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center relative">
+      <!-- Logomarca (Esquerda) -->
+      <a href="/"><img src="./img/carrilho.png" alt="Logo Carrilho" class="h-12 w-auto object-contain" /></a>
 
-    <!-- Título (Centralização Absoluta) -->
-    <h1 class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-green-600 font-bold text-xl tracking-wide hidden sm:block">
-      Sistema Inteligente de Conciliação
-    </h1>
 
-    <button id="btn-logout" onclick="logout()" class="absolute right-0 top-1/2 -translate-y-1/2 text-gray-500 hover:text-red-500 hidden items-center gap-2 mr-4 sm:mr-8 transition-colors">
-      <i class="ph ph-sign-out text-xl"></i><span class="hidden sm:inline">Sair</span>
-    </button>
-  </div>
-</header>
+      <!-- Título (Centralização Absoluta) -->
+      <h1
+        class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-green-600 font-bold text-xl tracking-wide hidden sm:block">
+        Sistema Inteligente de Conciliação
+      </h1>
 
-<!-- LOGIN VIEW -->
-<div id="view-login" class="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] hidden animate-[fadeIn_0.4s_ease-out_both]">
-  <div class="bg-white p-8 rounded-2xl shadow-card w-full max-w-md border border-gray-100">
-    <div class="text-center mb-8">
-      <h2 id="login-title" class="text-2xl font-bold text-gray-800 mb-2">Acesso Restrito</h2>
-      <p id="login-desc" class="text-gray-500 text-sm">Insira suas credenciais para acessar o sistema.</p>
-    </div>
-    
-    <form id="form-login" onsubmit="handleLogin(event)" class="space-y-5">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">E-mail corporativo</label>
-        <div class="relative">
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <i class="ph ph-envelope-simple text-gray-400 text-lg"></i>
-          </div>
-          <input type="email" id="login-email" required class="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#038201] focus:border-[#038201] transition-shadow text-sm" placeholder="usuario@carrilho.com">
-        </div>
-      </div>
-
-      <div id="div-password">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-        <div class="relative">
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <i class="ph ph-lock-key text-gray-400 text-lg"></i>
-          </div>
-          <input type="password" id="login-password" required class="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#038201] focus:border-[#038201] transition-shadow text-sm" placeholder="••••••••">
-        </div>
-      </div>
-
-      <div id="div-new-password" class="hidden">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Nova Senha</label>
-        <div class="relative">
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <i class="ph ph-lock-key text-gray-400 text-lg"></i>
-          </div>
-          <input type="password" id="login-new-password" class="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#038201] focus:border-[#038201] transition-shadow text-sm" placeholder="Sua nova senha">
-        </div>
-      </div>
-
-      <div id="login-error" class="hidden bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center border border-red-100"></div>
-      <div id="login-success" class="hidden bg-green-50 text-green-600 p-3 rounded-lg text-sm text-center border border-green-100"></div>
-
-      <button type="submit" id="btn-login-submit" class="w-full bg-[#038201] hover:bg-[#026901] text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-green-600/20 transition-all duration-200 flex justify-center items-center gap-2">
-        <span>Entrar</span>
-        <i class="ph ph-arrow-right text-lg"></i>
+      <button id="btn-logout" onclick="logout()"
+        class="absolute right-0 top-1/2 -translate-y-1/2 text-gray-500 hover:text-red-500 hidden items-center gap-2 mr-4 sm:mr-8 transition-colors">
+        <i class="ph ph-sign-out text-xl"></i><span class="hidden sm:inline">Sair</span>
       </button>
+    </div>
+  </header>
 
-      <div class="text-center mt-4">
-        <button type="button" id="btn-toggle-password" onclick="togglePasswordMode()" class="text-sm text-[#038201] hover:underline bg-transparent border-none cursor-pointer">
-          Quero alterar minha senha
-        </button>
+  <!-- LOGIN VIEW -->
+  <div id="view-login"
+    class="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] hidden animate-[fadeIn_0.4s_ease-out_both]">
+    <div class="bg-white p-8 rounded-2xl shadow-card w-full max-w-md border border-gray-100">
+      <div class="text-center mb-8">
+        <h2 id="login-title" class="text-2xl font-bold text-gray-800 mb-2">Acesso Restrito</h2>
+        <p id="login-desc" class="text-gray-500 text-sm">Insira suas credenciais para acessar o sistema.</p>
       </div>
-    </form>
-  </div>
-</div>
 
-<div id="app-content" class="hidden">
-<!-- NAV TABS -->
-<nav class="bg-white border-b border-gray-200">
-  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="flex space-x-8 justify-center">
-      <button onclick="switchTab('nova')" id="tab-nova" class="border-b-2 border-[#038201] text-[#038201] py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none">Nova Conciliação</button>
-      <button onclick="switchTab('historico')" id="tab-historico" class="border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none">Histórico & Analytics</button>
+      <form id="form-login" onsubmit="handleLogin(event)" class="space-y-5">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">E-mail corporativo</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="ph ph-envelope-simple text-gray-400 text-lg"></i>
+            </div>
+            <input type="email" id="login-email" required
+              class="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#038201] focus:border-[#038201] transition-shadow text-sm"
+              placeholder="usuario@carrilho.com">
+          </div>
+        </div>
+
+        <div id="div-password">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="ph ph-lock-key text-gray-400 text-lg"></i>
+            </div>
+            <input type="password" id="login-password" required
+              class="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#038201] focus:border-[#038201] transition-shadow text-sm"
+              placeholder="••••••••">
+          </div>
+        </div>
+
+        <div id="div-new-password" class="hidden">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Nova Senha</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="ph ph-lock-key text-gray-400 text-lg"></i>
+            </div>
+            <input type="password" id="login-new-password"
+              class="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#038201] focus:border-[#038201] transition-shadow text-sm"
+              placeholder="Sua nova senha">
+          </div>
+        </div>
+
+        <div id="login-error"
+          class="hidden bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center border border-red-100"></div>
+        <div id="login-success"
+          class="hidden bg-green-50 text-green-600 p-3 rounded-lg text-sm text-center border border-green-100"></div>
+
+        <button type="submit" id="btn-login-submit"
+          class="w-full bg-[#038201] hover:bg-[#026901] text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-green-600/20 transition-all duration-200 flex justify-center items-center gap-2">
+          <span>Entrar</span>
+          <i class="ph ph-arrow-right text-lg"></i>
+        </button>
+
+        <div class="text-center mt-4">
+          <button type="button" id="btn-toggle-password" onclick="togglePasswordMode()"
+            class="text-sm text-[#038201] hover:underline bg-transparent border-none cursor-pointer">
+            Quero alterar minha senha
+          </button>
+        </div>
+      </form>
     </div>
   </div>
-</nav>
 
-<!-- MAIN -->
-<main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+  <div id="app-content" class="hidden">
+    <!-- NAV TABS -->
+    <nav class="bg-white border-b border-gray-200">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex space-x-8 justify-center">
+          <button onclick="switchTab('nova')" id="tab-nova"
+            class="border-b-2 border-[#038201] text-[#038201] py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none">Nova
+            Conciliação</button>
+          <button onclick="switchTab('historico')" id="tab-historico"
+            class="border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none">Histórico
+            & Analytics</button>
+        </div>
+      </div>
+    </nav>
 
-  <!-- VIEW: UPLOAD -->
-  <div id="view-upload" class="animate-[fadeIn_0.4s_ease-out_both]">
-    <div class="text-center mb-8">
-      <h3 class="text-xl font-bold text-gray-800 mb-1">Selecione os Arquivos</h3>
-      <p class="text-gray-400 text-sm">Arraste e solte ou clique nas áreas abaixo para adicionar os extratos</p>
-    </div>
+    <!-- MAIN -->
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-      <!-- Cartão Argos -->
-      <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-100 hover:shadow-card-hover transition-all duration-300">
-        <div class="flex items-center gap-3 mb-5">
-          <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
-            <i class="ph ph-files text-[#038201] text-xl"></i>
+      <!-- VIEW: UPLOAD -->
+      <div id="view-upload" class="animate-[fadeIn_0.4s_ease-out_both]">
+        <div class="text-center mb-8">
+          <h3 class="text-xl font-bold text-gray-800 mb-1">Selecione os Arquivos</h3>
+          <p class="text-gray-400 text-sm">Arraste e solte ou clique nas áreas abaixo para adicionar os extratos</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <!-- Cartão Argos -->
+          <div
+            class="bg-white rounded-2xl shadow-card p-6 border border-gray-100 hover:shadow-card-hover transition-all duration-300">
+            <div class="flex items-center gap-3 mb-5">
+              <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                <i class="ph ph-files text-[#038201] text-xl"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-gray-800 text-sm leading-tight">Arquivos do Sistema Argos</h4>
+                <p class="text-gray-400 text-xs">Relatório de baixas exportado do ERP</p>
+              </div>
+            </div>
+            <div id="drop-argos"
+              class="drop-zone border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-[#038201] hover:bg-green-50 transition-all duration-200"
+              onclick="document.getElementById('input-argos').click()" ondragover="handleDragOver(event,'drop-argos')"
+              ondragleave="handleDragLeave(event,'drop-argos')" ondrop="handleDrop(event,'argos')">
+              <div class="flex flex-col items-center gap-3">
+                <div class="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center">
+                  <i class="ph ph-file-xls text-[#038201] text-3xl"></i>
+                </div>
+                <div>
+                  <p class="text-gray-600 font-medium text-sm">Arraste os extratos do Argos (.xlsx)</p>
+                  <p class="text-gray-400 text-xs mt-0.5">ou <span
+                      class="text-[#038201] font-semibold underline underline-offset-2">clique para procurar</span></p>
+                </div>
+                <span
+                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">
+                  <i class="ph ph-file-text text-xs"></i> .xlsx · múltiplos arquivos
+                </span>
+              </div>
+            </div>
+            <input id="input-argos" type="file" accept=".xlsx,.xls,.csv" multiple class="hidden"
+              onchange="handleFileInput(event,'argos')" />
+            <div id="list-argos" class="mt-4 space-y-2 hidden"></div>
+          </div>
+
+          <!-- Cartão Banco -->
+          <div
+            class="bg-white rounded-2xl shadow-card p-6 border border-gray-100 hover:shadow-card-hover transition-all duration-300">
+            <div class="flex items-center gap-3 mb-5">
+              <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                <i class="ph ph-bank text-[#038201] text-xl"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-gray-800 text-sm leading-tight">Extratos Bancários</h4>
+                <p class="text-gray-400 text-xs">Caixa Econômica · Banese · outros</p>
+              </div>
+            </div>
+            <div id="drop-bank"
+              class="drop-zone border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-[#038201] hover:bg-green-50 transition-all duration-200"
+              onclick="document.getElementById('input-bank').click()" ondragover="handleDragOver(event,'drop-bank')"
+              ondragleave="handleDragLeave(event,'drop-bank')" ondrop="handleDrop(event,'bank')">
+              <div class="flex flex-col items-center gap-3">
+                <div class="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center">
+                  <i class="ph ph-currency-circle-dollar text-[#038201] text-3xl"></i>
+                </div>
+                <div>
+                  <p class="text-gray-600 font-medium text-sm">Arraste os extratos do Banco (.xlsx)</p>
+                  <p class="text-gray-400 text-xs mt-0.5">ou <span
+                      class="text-[#038201] font-semibold underline underline-offset-2">clique para procurar</span></p>
+                </div>
+                <span
+                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">
+                  <i class="ph ph-file-text text-xs"></i> .xlsx · múltiplos arquivos
+                </span>
+              </div>
+            </div>
+            <input id="input-bank" type="file" accept=".xlsx,.xls,.csv" multiple class="hidden"
+              onchange="handleFileInput(event,'bank')" />
+            <div id="list-bank" class="mt-4 space-y-2 hidden"></div>
+          </div>
+        </div>
+
+        <!-- Seletor de Banco -->
+        <div class="flex items-center justify-center gap-3 mb-4">
+          <label for="select-banco" class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Banco do
+            extrato:</label>
+          <select id="select-banco"
+            class="text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl px-4 py-2 shadow-sm cursor-pointer hover:border-[#038201] focus:outline-none focus:ring-2 focus:ring-[#038201]/20 transition-all">
+            <option value="generico">Genérico (auto-detect)</option>
+            <option value="banese">Banese</option>
+            <option value="caixa">Caixa Econômica</option>
+          </select>
+        </div>
+
+        <!-- Botão Principal -->
+        <div class="flex flex-col items-center gap-3">
+          <p id="btn-hint" class="text-gray-400 text-xs transition-all duration-300">Adicione pelo menos um arquivo de
+            cada tipo para continuar</p>
+          <button id="btn-start" onclick="startReconciliation()" disabled
+            class="relative flex items-center gap-3 px-10 py-4 rounded-2xl font-bold text-base tracking-wide transition-all duration-300 bg-gray-300 text-gray-400 cursor-not-allowed">
+            <i class="ph ph-arrows-left-right text-xl"></i>
+            INICIAR CONCILIAÇÃO
+          </button>
+          <div class="flex flex-wrap justify-center items-center gap-4 mt-1">
+            <div class="flex items-center gap-1.5 text-xs text-gray-400"><i
+                class="ph ph-check-circle text-[#038201] text-sm"></i>Regra 1 · Match Exato</div>
+            <div class="flex items-center gap-1.5 text-xs text-gray-400"><i
+                class="ph ph-check-circle text-[#038201] text-sm"></i>Regra 2 · Regex Histórico</div>
+            <div class="flex items-center gap-1.5 text-xs text-gray-400"><i
+                class="ph ph-check-circle text-[#038201] text-sm"></i>Regra 3 · Desmembrados</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW: LOADING -->
+      <div id="view-loading" class="hidden">
+        <div class="flex flex-col items-center justify-center py-20 gap-8">
+          <div class="relative w-28 h-28">
+            <svg class="w-full h-full animate-spin-slow" viewBox="0 0 100 100" fill="none">
+              <circle cx="50" cy="50" r="44" stroke="#e5e7eb" stroke-width="8" />
+              <circle cx="50" cy="50" r="44" stroke="#038201" stroke-width="8" stroke-dasharray="207 69"
+                stroke-dashoffset="17" stroke-linecap="round" />
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <i class="ph ph-arrows-left-right text-[#038201] text-3xl animate-pulse-ring"></i>
+            </div>
+          </div>
+          <div class="text-center">
+            <p class="text-gray-800 font-semibold text-lg mb-1">Processando Conciliação<span class="dots"></span></p>
+            <p class="text-gray-400 text-sm">Cruzando milhares de registros — isso pode levar alguns segundos.</p>
+          </div>
+          <div class="w-full max-w-md">
+            <div class="flex justify-between text-xs text-gray-400 mb-2 font-medium">
+              <span id="progress-label">Iniciando leitura dos arquivos</span>
+              <span id="progress-pct">0%</span>
+            </div>
+            <div class="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+              <div id="progress-bar" style="width:0%;transition:width 0.5s ease"
+                class="h-full bg-gradient-to-r from-[#038201] to-green-400 rounded-full"></div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-lg">
+            <div id="step-1"
+              class="flex items-center gap-2 bg-white rounded-xl p-3 shadow-card border border-gray-100 opacity-40 transition-all duration-500">
+              <i class="ph ph-magnifying-glass text-[#038201] text-lg flex-shrink-0"></i>
+              <span class="text-xs font-medium text-gray-600">Match Exato</span>
+            </div>
+            <div id="step-2"
+              class="flex items-center gap-2 bg-white rounded-xl p-3 shadow-card border border-gray-100 opacity-40 transition-all duration-500">
+              <i class="ph ph-code text-[#038201] text-lg flex-shrink-0"></i>
+              <span class="text-xs font-medium text-gray-600">Regex Histórico</span>
+            </div>
+            <div id="step-3"
+              class="flex items-center gap-2 bg-white rounded-xl p-3 shadow-card border border-gray-100 opacity-40 transition-all duration-500">
+              <i class="ph ph-git-merge text-[#038201] text-lg flex-shrink-0"></i>
+              <span class="text-xs font-medium text-gray-600">Desmembrados</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW: RESULTS -->
+      <div id="view-results" class="hidden">
+        <!-- Banner -->
+        <div class="flex items-center gap-3 bg-green-50 border border-green-100 rounded-2xl px-5 py-4 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-[#038201] flex items-center justify-center flex-shrink-0">
+            <i class="ph ph-check-fat text-white text-xl"></i>
           </div>
           <div>
-            <h4 class="font-bold text-gray-800 text-sm leading-tight">Arquivos do Sistema Argos</h4>
-            <p class="text-gray-400 text-xs">Relatório de baixas exportado do ERP</p>
+            <p class="font-bold text-green-800 text-sm">Conciliação Concluída com Sucesso!</p>
+            <p id="kpi-total" class="text-green-600 text-xs">Planilha pronta para download</p>
+          </div>
+          <div class="ml-auto text-right hidden sm:block">
+            <p class="text-green-600 text-xs font-medium">Taxa de Conciliação</p>
+            <p id="kpi-taxa" class="text-green-800 font-bold text-sm">—</p>
           </div>
         </div>
-        <div id="drop-argos" class="drop-zone border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-[#038201] hover:bg-green-50 transition-all duration-200"
-          onclick="document.getElementById('input-argos').click()"
-          ondragover="handleDragOver(event,'drop-argos')"
-          ondragleave="handleDragLeave(event,'drop-argos')"
-          ondrop="handleDrop(event,'argos')">
-          <div class="flex flex-col items-center gap-3">
-            <div class="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center">
-              <i class="ph ph-file-xls text-[#038201] text-3xl"></i>
+
+        <!-- Inline Edit Period -->
+        <div
+          class="flex items-center justify-between bg-white border border-gray-100 rounded-2xl px-5 py-3 mb-8 shadow-sm">
+          <div class="flex items-center gap-2">
+            <i class="ph ph-calendar text-gray-400 text-lg"></i>
+            <p class="text-sm text-gray-500 font-medium">Período Processado:</p>
+          </div>
+
+          <!-- Static View -->
+          <div id="periodo-view" class="flex items-center gap-2">
+            <span id="periodo-text" class="text-sm font-bold text-gray-800">Desconhecido</span>
+            <button onclick="toggleEditPeriodo()" class="text-gray-400 hover:text-[#038201] transition-colors"
+              title="Editar Período">
+              <i class="ph ph-pencil-simple text-sm"></i>
+            </button>
+          </div>
+
+          <!-- Edit View -->
+          <div id="periodo-edit" class="hidden flex items-center gap-2">
+            <input type="text" id="periodo-input"
+              class="text-sm font-bold text-gray-800 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-[#038201] w-32 text-center" />
+            <button onclick="salvarPeriodo()" class="text-green-600 hover:text-green-700 transition-colors"
+              title="Salvar">
+              <i class="ph ph-check-circle text-lg"></i>
+            </button>
+            <button onclick="toggleEditPeriodo()" class="text-red-500 hover:text-red-600 transition-colors"
+              title="Cancelar">
+              <i class="ph ph-x-circle text-lg"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          <div
+            class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.1s_both]">
+            <div class="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center mx-auto mb-3"><i
+                class="ph ph-check-circle text-[#038201] text-2xl"></i></div>
+            <div id="kpi-perfeito" class="text-3xl font-extrabold text-[#038201] mb-1">—</div>
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">
+              Conciliados<br />Perfeitos</div>
+            <div
+              class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 text-[#038201] text-[10px] font-semibold">
+              <i class="ph ph-trend-up text-xs"></i>Regra 1
             </div>
-            <div>
-              <p class="text-gray-600 font-medium text-sm">Arraste os extratos do Argos (.xlsx)</p>
-              <p class="text-gray-400 text-xs mt-0.5">ou <span class="text-[#038201] font-semibold underline underline-offset-2">clique para procurar</span></p>
+          </div>
+          <div
+            class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.2s_both]">
+            <div class="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-3"><i
+                class="ph ph-code text-blue-500 text-2xl"></i></div>
+            <div id="kpi-historico" class="text-3xl font-extrabold text-blue-500 mb-1">—</div>
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">Via<br />Histórico
             </div>
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">
-              <i class="ph ph-file-text text-xs"></i> .xlsx · múltiplos arquivos
-            </span>
-          </div>
-        </div>
-        <input id="input-argos" type="file" accept=".xlsx,.xls,.csv" multiple class="hidden" onchange="handleFileInput(event,'argos')" />
-        <div id="list-argos" class="mt-4 space-y-2 hidden"></div>
-      </div>
-
-      <!-- Cartão Banco -->
-      <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-100 hover:shadow-card-hover transition-all duration-300">
-        <div class="flex items-center gap-3 mb-5">
-          <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
-            <i class="ph ph-bank text-[#038201] text-xl"></i>
-          </div>
-          <div>
-            <h4 class="font-bold text-gray-800 text-sm leading-tight">Extratos Bancários</h4>
-            <p class="text-gray-400 text-xs">Caixa Econômica · Banese · outros</p>
-          </div>
-        </div>
-        <div id="drop-bank" class="drop-zone border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-[#038201] hover:bg-green-50 transition-all duration-200"
-          onclick="document.getElementById('input-bank').click()"
-          ondragover="handleDragOver(event,'drop-bank')"
-          ondragleave="handleDragLeave(event,'drop-bank')"
-          ondrop="handleDrop(event,'bank')">
-          <div class="flex flex-col items-center gap-3">
-            <div class="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center">
-              <i class="ph ph-currency-circle-dollar text-[#038201] text-3xl"></i>
+            <div
+              class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-500 text-[10px] font-semibold">
+              <i class="ph ph-regex text-xs"></i>Regra 2
             </div>
-            <div>
-              <p class="text-gray-600 font-medium text-sm">Arraste os extratos do Banco (.xlsx)</p>
-              <p class="text-gray-400 text-xs mt-0.5">ou <span class="text-[#038201] font-semibold underline underline-offset-2">clique para procurar</span></p>
+          </div>
+          <div
+            class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.3s_both]">
+            <div class="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-3"><i
+                class="ph ph-git-merge text-purple-500 text-2xl"></i></div>
+            <div id="kpi-desmembrado" class="text-3xl font-extrabold text-purple-500 mb-1">—</div>
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">
+              Valores<br />Desmembrados</div>
+            <div
+              class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 text-purple-500 text-[10px] font-semibold">
+              <i class="ph ph-intersect text-xs"></i>Regra 3
             </div>
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">
-              <i class="ph ph-file-text text-xs"></i> .xlsx · múltiplos arquivos
-            </span>
+          </div>
+          <div
+            class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.35s_both]">
+            <div class="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-3"><i
+                class="ph ph-arrow-circle-down text-red-500 text-2xl"></i></div>
+            <div id="kpi-saidas" class="text-3xl font-extrabold text-red-500 mb-1">—</div>
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">Saídas
+              /<br />Estornos</div>
+            <div
+              class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-500 text-[10px] font-semibold">
+              <i class="ph ph-funnel text-xs"></i>Regra 4
+            </div>
+          </div>
+          <div
+            class="bg-white rounded-2xl shadow-card border border-amber-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.4s_both] relative overflow-hidden">
+            <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-red-400 rounded-t-2xl">
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-3 mt-1"><i
+                class="ph ph-warning text-amber-500 text-2xl"></i></div>
+            <div id="kpi-divergencias" class="text-3xl font-extrabold text-amber-500 mb-1">—</div>
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">
+              Divergências<br />Pendentes</div>
+            <div
+              class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 text-[10px] font-semibold">
+              <i class="ph ph-hand-pointing text-xs"></i>Ação Manual
+            </div>
           </div>
         </div>
-        <input id="input-bank" type="file" accept=".xlsx,.xls,.csv" multiple class="hidden" onchange="handleFileInput(event,'bank')" />
-        <div id="list-bank" class="mt-4 space-y-2 hidden"></div>
-      </div>
-    </div>
 
-    <!-- Seletor de Banco -->
-    <div class="flex items-center justify-center gap-3 mb-4">
-      <label for="select-banco" class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Banco do extrato:</label>
-      <select id="select-banco"
-        class="text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl px-4 py-2 shadow-sm cursor-pointer hover:border-[#038201] focus:outline-none focus:ring-2 focus:ring-[#038201]/20 transition-all">
-        <option value="generico">Genérico (auto-detect)</option>
-        <option value="banese">Banese</option>
-        <option value="caixa">Caixa Econômica</option>
-      </select>
-    </div>
+        <!-- Barra Visual -->
+        <div
+          class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 mb-8 animate-[slideUp_0.5s_ease-out_0.5s_both]">
+          <div class="flex justify-between items-center mb-3">
+            <p class="text-sm font-semibold text-gray-700">Taxa de Conciliação Automática</p>
+            <p id="kpi-taxa-barra" class="text-lg font-extrabold text-[#038201]">—</p>
+          </div>
+          <div id="barra-dist" class="w-full h-3 bg-gray-100 rounded-full overflow-hidden flex gap-0.5">
+            <div class="h-full bg-[#038201] rounded-l-full transition-all duration-700" style="width:0%"></div>
+            <div class="h-full bg-blue-400 transition-all duration-700" style="width:0%"></div>
+            <div class="h-full bg-purple-400 transition-all duration-700" style="width:0%"></div>
+            <div class="h-full bg-red-400 transition-all duration-700" style="width:0%"></div>
+            <div class="h-full bg-amber-400 rounded-r-full transition-all duration-700" style="width:0%"></div>
+          </div>
+          <div class="legenda-dist flex flex-wrap gap-4 mt-3">
+            <div class="flex items-center gap-1.5 text-xs text-gray-500"><span
+                class="w-2.5 h-2.5 rounded-full bg-[#038201] flex-shrink-0"></span><span>Perfeitos</span></div>
+            <div class="flex items-center gap-1.5 text-xs text-gray-500"><span
+                class="w-2.5 h-2.5 rounded-full bg-blue-400 flex-shrink-0"></span><span>Via Histórico</span></div>
+            <div class="flex items-center gap-1.5 text-xs text-gray-500"><span
+                class="w-2.5 h-2.5 rounded-full bg-purple-400 flex-shrink-0"></span><span>Desmembrados</span></div>
+            <div class="flex items-center gap-1.5 text-xs text-gray-500"><span
+                class="w-2.5 h-2.5 rounded-full bg-red-400 flex-shrink-0"></span><span>Saídas/Estornos</span></div>
+            <div class="flex items-center gap-1.5 text-xs text-gray-500"><span
+                class="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0"></span><span>Divergências</span></div>
+          </div>
+        </div>
 
-    <!-- Botão Principal -->
-    <div class="flex flex-col items-center gap-3">
-      <p id="btn-hint" class="text-gray-400 text-xs transition-all duration-300">Adicione pelo menos um arquivo de cada tipo para continuar</p>
-      <button id="btn-start" onclick="startReconciliation()" disabled
-        class="relative flex items-center gap-3 px-10 py-4 rounded-2xl font-bold text-base tracking-wide transition-all duration-300 bg-gray-300 text-gray-400 cursor-not-allowed">
-        <i class="ph ph-arrows-left-right text-xl"></i>
-        INICIAR CONCILIAÇÃO
-      </button>
-      <div class="flex flex-wrap justify-center items-center gap-4 mt-1">
-        <div class="flex items-center gap-1.5 text-xs text-gray-400"><i class="ph ph-check-circle text-[#038201] text-sm"></i>Regra 1 · Match Exato</div>
-        <div class="flex items-center gap-1.5 text-xs text-gray-400"><i class="ph ph-check-circle text-[#038201] text-sm"></i>Regra 2 · Regex Histórico</div>
-        <div class="flex items-center gap-1.5 text-xs text-gray-400"><i class="ph ph-check-circle text-[#038201] text-sm"></i>Regra 3 · Desmembrados</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- VIEW: LOADING -->
-  <div id="view-loading" class="hidden">
-    <div class="flex flex-col items-center justify-center py-20 gap-8">
-      <div class="relative w-28 h-28">
-        <svg class="w-full h-full animate-spin-slow" viewBox="0 0 100 100" fill="none">
-          <circle cx="50" cy="50" r="44" stroke="#e5e7eb" stroke-width="8"/>
-          <circle cx="50" cy="50" r="44" stroke="#038201" stroke-width="8" stroke-dasharray="207 69" stroke-dashoffset="17" stroke-linecap="round"/>
-        </svg>
-        <div class="absolute inset-0 flex items-center justify-center">
-          <i class="ph ph-arrows-left-right text-[#038201] text-3xl animate-pulse-ring"></i>
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center animate-[slideUp_0.5s_ease-out_0.6s_both]">
+          <button onclick="triggerDownload()" id="btn-download"
+            class="flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-[#038201] text-white font-bold text-base shadow-[0_4px_24px_rgba(3,130,1,0.35)] hover:bg-[#026901] hover:shadow-[0_8px_32px_rgba(3,130,1,0.45)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
+            <i class="ph ph-file-arrow-down text-2xl"></i>
+            📥 Baixar Planilha de Conciliação (.xlsx)
+          </button>
+          <button onclick="resetApp()"
+            class="flex items-center justify-center gap-2 px-6 py-4 rounded-2xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:border-[#038201] hover:text-[#038201] hover:bg-green-50 transition-all duration-200 cursor-pointer">
+            <i class="ph ph-arrow-counter-clockwise text-lg"></i>
+            Fazer Nova Conciliação
+          </button>
         </div>
       </div>
-      <div class="text-center">
-        <p class="text-gray-800 font-semibold text-lg mb-1">Processando Conciliação<span class="dots"></span></p>
-        <p class="text-gray-400 text-sm">Cruzando milhares de registros — isso pode levar alguns segundos.</p>
-      </div>
-      <div class="w-full max-w-md">
-        <div class="flex justify-between text-xs text-gray-400 mb-2 font-medium">
-          <span id="progress-label">Iniciando leitura dos arquivos</span>
-          <span id="progress-pct">0%</span>
+
+      <!-- VIEW: HISTORICO -->
+      <div id="view-historico" class="hidden animate-[fadeIn_0.4s_ease-out_both]">
+        <div class="mb-8">
+          <h3 class="text-xl font-bold text-gray-800 mb-1">Histórico & Analytics</h3>
+          <p class="text-gray-400 text-sm">Acompanhe a evolução da sua conciliação ao longo do tempo</p>
         </div>
-        <div class="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
-          <div id="progress-bar" style="width:0%;transition:width 0.5s ease" class="h-full bg-gradient-to-r from-[#038201] to-green-400 rounded-full"></div>
+
+        <!-- Charts -->
+        <div id="charts-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-100">
+            <h4 class="font-bold text-gray-800 text-sm mb-4">Evolução da Taxa de Sucesso (%)</h4>
+            <div class="relative h-64">
+              <canvas id="chart-taxa"></canvas>
+            </div>
+          </div>
+          <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-100">
+            <h4 class="font-bold text-gray-800 text-sm mb-4">Sucesso vs Divergências (Qtd)</h4>
+            <div class="relative h-64">
+              <canvas id="chart-barras"></canvas>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-lg">
-        <div id="step-1" class="flex items-center gap-2 bg-white rounded-xl p-3 shadow-card border border-gray-100 opacity-40 transition-all duration-500">
-          <i class="ph ph-magnifying-glass text-[#038201] text-lg flex-shrink-0"></i>
-          <span class="text-xs font-medium text-gray-600">Match Exato</span>
+
+        <!-- Empty State -->
+        <div id="historico-empty"
+          class="bg-white rounded-2xl shadow-card p-12 border border-gray-100 text-center mb-8 hidden">
+          <i class="ph ph-chart-line-up text-5xl text-gray-300 mb-4 inline-block"></i>
+          <h4 class="text-lg font-bold text-gray-700 mb-2">Nenhum histórico disponível</h4>
+          <p class="text-gray-400 text-sm max-w-sm mx-auto">Faça uma nova conciliação para ver as estatísticas
+            aparecerem aqui.</p>
         </div>
-        <div id="step-2" class="flex items-center gap-2 bg-white rounded-xl p-3 shadow-card border border-gray-100 opacity-40 transition-all duration-500">
-          <i class="ph ph-code text-[#038201] text-lg flex-shrink-0"></i>
-          <span class="text-xs font-medium text-gray-600">Regex Histórico</span>
+
+        <!-- Table -->
+        <div class="mb-4 flex justify-end">
+          <button id="bulk-delete-btn" onclick="excluirSelecionados()"
+            class="hidden bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-100 transition-colors">
+            <i class="ph ph-trash mr-1"></i> Excluir Selecionados
+          </button>
         </div>
-        <div id="step-3" class="flex items-center gap-2 bg-white rounded-xl p-3 shadow-card border border-gray-100 opacity-40 transition-all duration-500">
-          <i class="ph ph-git-merge text-[#038201] text-lg flex-shrink-0"></i>
-          <span class="text-xs font-medium text-gray-600">Desmembrados</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- VIEW: RESULTS -->
-  <div id="view-results" class="hidden">
-    <!-- Banner -->
-    <div class="flex items-center gap-3 bg-green-50 border border-green-100 rounded-2xl px-5 py-4 mb-4">
-      <div class="w-10 h-10 rounded-xl bg-[#038201] flex items-center justify-center flex-shrink-0">
-        <i class="ph ph-check-fat text-white text-xl"></i>
-      </div>
-      <div>
-        <p class="font-bold text-green-800 text-sm">Conciliação Concluída com Sucesso!</p>
-        <p id="kpi-total" class="text-green-600 text-xs">Planilha pronta para download</p>
-      </div>
-      <div class="ml-auto text-right hidden sm:block">
-        <p class="text-green-600 text-xs font-medium">Taxa de Conciliação</p>
-        <p id="kpi-taxa" class="text-green-800 font-bold text-sm">—</p>
-      </div>
-    </div>
-
-    <!-- Inline Edit Period -->
-    <div class="flex items-center justify-between bg-white border border-gray-100 rounded-2xl px-5 py-3 mb-8 shadow-sm">
-      <div class="flex items-center gap-2">
-        <i class="ph ph-calendar text-gray-400 text-lg"></i>
-        <p class="text-sm text-gray-500 font-medium">Período Processado:</p>
-      </div>
-      
-      <!-- Static View -->
-      <div id="periodo-view" class="flex items-center gap-2">
-        <span id="periodo-text" class="text-sm font-bold text-gray-800">Desconhecido</span>
-        <button onclick="toggleEditPeriodo()" class="text-gray-400 hover:text-[#038201] transition-colors" title="Editar Período">
-          <i class="ph ph-pencil-simple text-sm"></i>
-        </button>
-      </div>
-
-      <!-- Edit View -->
-      <div id="periodo-edit" class="hidden flex items-center gap-2">
-        <input type="text" id="periodo-input" class="text-sm font-bold text-gray-800 border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-[#038201] w-32 text-center" />
-        <button onclick="salvarPeriodo()" class="text-green-600 hover:text-green-700 transition-colors" title="Salvar">
-          <i class="ph ph-check-circle text-lg"></i>
-        </button>
-        <button onclick="toggleEditPeriodo()" class="text-red-500 hover:text-red-600 transition-colors" title="Cancelar">
-          <i class="ph ph-x-circle text-lg"></i>
-        </button>
-      </div>
-    </div>
-
-    <!-- KPI Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-      <div class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.1s_both]">
-        <div class="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center mx-auto mb-3"><i class="ph ph-check-circle text-[#038201] text-2xl"></i></div>
-        <div id="kpi-perfeito" class="text-3xl font-extrabold text-[#038201] mb-1">—</div>
-        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">Conciliados<br/>Perfeitos</div>
-        <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 text-[#038201] text-[10px] font-semibold"><i class="ph ph-trend-up text-xs"></i>Regra 1</div>
-      </div>
-      <div class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.2s_both]">
-        <div class="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-3"><i class="ph ph-code text-blue-500 text-2xl"></i></div>
-        <div id="kpi-historico" class="text-3xl font-extrabold text-blue-500 mb-1">—</div>
-        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">Via<br/>Histórico</div>
-        <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-500 text-[10px] font-semibold"><i class="ph ph-regex text-xs"></i>Regra 2</div>
-      </div>
-      <div class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.3s_both]">
-        <div class="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-3"><i class="ph ph-git-merge text-purple-500 text-2xl"></i></div>
-        <div id="kpi-desmembrado" class="text-3xl font-extrabold text-purple-500 mb-1">—</div>
-        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">Valores<br/>Desmembrados</div>
-        <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 text-purple-500 text-[10px] font-semibold"><i class="ph ph-intersect text-xs"></i>Regra 3</div>
-      </div>
-      <div class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.35s_both]">
-        <div class="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-3"><i class="ph ph-arrow-circle-down text-red-500 text-2xl"></i></div>
-        <div id="kpi-saidas" class="text-3xl font-extrabold text-red-500 mb-1">—</div>
-        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">Saídas /<br/>Estornos</div>
-        <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-500 text-[10px] font-semibold"><i class="ph ph-funnel text-xs"></i>Regra 4</div>
-      </div>
-      <div class="bg-white rounded-2xl shadow-card border border-amber-100 p-5 text-center hover:shadow-card-hover transition-all duration-300 animate-[slideUp_0.5s_ease-out_0.4s_both] relative overflow-hidden">
-        <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-red-400 rounded-t-2xl"></div>
-        <div class="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-3 mt-1"><i class="ph ph-warning text-amber-500 text-2xl"></i></div>
-        <div id="kpi-divergencias" class="text-3xl font-extrabold text-amber-500 mb-1">—</div>
-        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">Divergências<br/>Pendentes</div>
-        <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 text-[10px] font-semibold"><i class="ph ph-hand-pointing text-xs"></i>Ação Manual</div>
-      </div>
-    </div>
-
-    <!-- Barra Visual -->
-    <div class="bg-white rounded-2xl shadow-card border border-gray-100 p-5 mb-8 animate-[slideUp_0.5s_ease-out_0.5s_both]">
-      <div class="flex justify-between items-center mb-3">
-        <p class="text-sm font-semibold text-gray-700">Taxa de Conciliação Automática</p>
-        <p id="kpi-taxa-barra" class="text-lg font-extrabold text-[#038201]">—</p>
-      </div>
-      <div id="barra-dist" class="w-full h-3 bg-gray-100 rounded-full overflow-hidden flex gap-0.5">
-        <div class="h-full bg-[#038201] rounded-l-full transition-all duration-700" style="width:0%"></div>
-        <div class="h-full bg-blue-400 transition-all duration-700" style="width:0%"></div>
-        <div class="h-full bg-purple-400 transition-all duration-700" style="width:0%"></div>
-        <div class="h-full bg-red-400 transition-all duration-700" style="width:0%"></div>
-        <div class="h-full bg-amber-400 rounded-r-full transition-all duration-700" style="width:0%"></div>
-      </div>
-      <div class="legenda-dist flex flex-wrap gap-4 mt-3">
-        <div class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-[#038201] flex-shrink-0"></span><span>Perfeitos</span></div>
-        <div class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-blue-400 flex-shrink-0"></span><span>Via Histórico</span></div>
-        <div class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-purple-400 flex-shrink-0"></span><span>Desmembrados</span></div>
-        <div class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-red-400 flex-shrink-0"></span><span>Saídas/Estornos</span></div>
-        <div class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0"></span><span>Divergências</span></div>
-      </div>
-    </div>
-
-    <!-- Action Buttons -->
-    <div class="flex flex-col sm:flex-row gap-4 justify-center animate-[slideUp_0.5s_ease-out_0.6s_both]">
-      <button onclick="triggerDownload()" id="btn-download"
-        class="flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-[#038201] text-white font-bold text-base shadow-[0_4px_24px_rgba(3,130,1,0.35)] hover:bg-[#026901] hover:shadow-[0_8px_32px_rgba(3,130,1,0.45)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
-        <i class="ph ph-file-arrow-down text-2xl"></i>
-        📥 Baixar Planilha de Conciliação (.xlsx)
-      </button>
-      <button onclick="resetApp()"
-        class="flex items-center justify-center gap-2 px-6 py-4 rounded-2xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:border-[#038201] hover:text-[#038201] hover:bg-green-50 transition-all duration-200 cursor-pointer">
-        <i class="ph ph-arrow-counter-clockwise text-lg"></i>
-        Fazer Nova Conciliação
-      </button>
-    </div>
-  </div>
-
-  <!-- VIEW: HISTORICO -->
-  <div id="view-historico" class="hidden animate-[fadeIn_0.4s_ease-out_both]">
-    <div class="mb-8">
-      <h3 class="text-xl font-bold text-gray-800 mb-1">Histórico & Analytics</h3>
-      <p class="text-gray-400 text-sm">Acompanhe a evolução da sua conciliação ao longo do tempo</p>
-    </div>
-
-    <!-- Charts -->
-    <div id="charts-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-      <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-100">
-        <h4 class="font-bold text-gray-800 text-sm mb-4">Evolução da Taxa de Sucesso (%)</h4>
-        <div class="relative h-64">
-          <canvas id="chart-taxa"></canvas>
+        <div class="bg-white rounded-2xl shadow-card border border-gray-100 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-gray-50 border-b border-gray-100">
+                  <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider w-12 text-center">
+                    <input type="checkbox" id="selectAll" onclick="toggleSelectAll()">
+                  </th>
+                  <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Data de
+                    Processamento</th>
+                  <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Período</th>
+                  <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+                    Conciliados</th>
+                  <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+                    Divergências</th>
+                  <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Taxa de
+                    Sucesso</th>
+                  <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Ação
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="tabela-historico" class="divide-y divide-gray-100 text-sm">
+                <tr>
+                  <td colspan="6" class="py-8 text-center text-gray-400">Carregando histórico...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-      <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-100">
-        <h4 class="font-bold text-gray-800 text-sm mb-4">Sucesso vs Divergências (Qtd)</h4>
-        <div class="relative h-64">
-          <canvas id="chart-barras"></canvas>
-        </div>
-      </div>
-    </div>
 
-    <!-- Empty State -->
-    <div id="historico-empty" class="bg-white rounded-2xl shadow-card p-12 border border-gray-100 text-center mb-8 hidden">
-      <i class="ph ph-chart-line-up text-5xl text-gray-300 mb-4 inline-block"></i>
-      <h4 class="text-lg font-bold text-gray-700 mb-2">Nenhum histórico disponível</h4>
-      <p class="text-gray-400 text-sm max-w-sm mx-auto">Faça uma nova conciliação para ver as estatísticas aparecerem aqui.</p>
-    </div>
+    </main>
 
-    <!-- Table -->
-    <div class="bg-white rounded-2xl shadow-card border border-gray-100 overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
-          <thead>
-            <tr class="bg-gray-50 border-b border-gray-100">
-              <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Data de Processamento</th>
-              <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Período</th>
-              <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Conciliados</th>
-              <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Divergências</th>
-              <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Taxa de Sucesso</th>
-              <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Ação</th>
-            </tr>
-          </thead>
-          <tbody id="tabela-historico" class="divide-y divide-gray-100 text-sm">
-            <tr><td colspan="6" class="py-8 text-center text-gray-400">Carregando histórico...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-</main>
-
-<!-- FOOTER -->
-<footer class="mt-16 border-t border-gray-100 bg-white fixed bottom-0 w-full">
-  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-    <p class="text-xs text-gray-400">© 2026 <span class="font-semibold text-gray-500">Carrilho Distribuidora</span> · Sistema de Conciliação Bancária v2.0</p>
-    <div class="flex items-center gap-2 text-xs text-gray-400">
+    <!-- FOOTER -->
+    <footer class="mt-16 border-t border-gray-100 bg-white w-full">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-center">
+        <p class="text-xs text-gray-400">© 2026 <span class="font-semibold text-gray-500">Carrilho Distribuidora</span>
+          · Sistema de Conciliação Bancária · Desenvolvido por Rainan de Oliveira Reis</p>
+        <!-- <div class="flex items-center gap-2 text-xs text-gray-400">
       <i class="ph ph-lock-simple text-[#038201] text-sm"></i>
       Seus arquivos são processados localmente e não são enviados à nuvem.
-    </div>
-  </div>
-</footer>
+    </div> -->
+      </div>
+    </footer>
 
-<!-- TOAST -->
-<div id="toast" class="fixed bottom-6 right-6 z-50 hidden max-w-xs">
-  <div class="flex items-start gap-3 bg-white rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-gray-100 p-4 animate-[slideUp_0.3s_ease-out_both]">
-    <i id="toast-icon" class="ph ph-check-circle text-[#038201] text-xl flex-shrink-0 mt-0.5"></i>
-    <div>
-      <p id="toast-title" class="text-sm font-semibold text-gray-800"></p>
-      <p id="toast-body" class="text-xs text-gray-400 mt-0.5"></p>
-    </div>
-    <button onclick="hideToast()" class="ml-auto text-gray-300 hover:text-gray-500 transition-colors">
-      <i class="ph ph-x text-sm"></i>
-    </button>
-  </div>
-</div>
-
-<!-- MODAL DE ANOTAÇÃO -->
-<div id="modal-anotacao" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
-  <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onclick="fecharModalAnotacao()"></div>
-  <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-[slideUp_0.3s_ease-out_both]">
-    
-    <div class="flex items-center justify-between p-6 border-b border-gray-100">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500">
-          <i class="ph ph-notebook text-xl"></i>
-        </div>
+    <!-- TOAST -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 hidden max-w-xs">
+      <div
+        class="flex items-start gap-3 bg-white rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-gray-100 p-4 animate-[slideUp_0.3s_ease-out_both]">
+        <i id="toast-icon" class="ph ph-check-circle text-[#038201] text-xl flex-shrink-0 mt-0.5"></i>
         <div>
-          <h2 class="text-lg font-bold text-gray-800">Anotações da Conciliação</h2>
-          <p id="modal-anotacao-periodo" class="text-xs text-gray-400 font-medium">Período: 01/06 a 30/06</p>
+          <p id="toast-title" class="text-sm font-semibold text-gray-800"></p>
+          <p id="toast-body" class="text-xs text-gray-400 mt-0.5"></p>
         </div>
-      </div>
-      <button onclick="fecharModalAnotacao()" class="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-lg hover:bg-gray-50">
-        <i class="ph ph-x text-lg"></i>
-      </button>
-    </div>
-
-    <div class="p-6 flex-1 overflow-y-auto bg-gray-50/50">
-      <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden flex flex-col h-64">
-        <!-- Toolbar -->
-        <div class="flex items-center gap-2 p-2 border-b border-gray-100 bg-gray-50">
-          <button type="button" onclick="formatarAnotacao('hiliteColor', '#fef08a')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-gray-600 hover:text-amber-500 transition-all" title="Grifar (Amarelo)">
-            <i class="ph ph-highlighter-circle text-lg"></i>
-          </button>
-          <div class="w-px h-5 bg-gray-200 mx-1"></div>
-          <button type="button" onclick="formatarAnotacao('foreColor', '#ef4444')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-red-500 transition-all" title="Texto Vermelho">
-            <i class="ph ph-text-aa text-lg"></i>
-          </button>
-          <button type="button" onclick="formatarAnotacao('foreColor', '#22c55e')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-green-500 transition-all" title="Texto Verde">
-            <i class="ph ph-text-aa text-lg"></i>
-          </button>
-          <button type="button" onclick="formatarAnotacao('foreColor', '#3b82f6')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-blue-500 transition-all" title="Texto Azul">
-            <i class="ph ph-text-aa text-lg"></i>
-          </button>
-          <div class="w-px h-5 bg-gray-200 mx-1"></div>
-          <button type="button" onclick="formatarAnotacao('removeFormat')" class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-gray-400 hover:text-gray-600 transition-all" title="Remover Formatação">
-            <i class="ph ph-eraser text-lg"></i>
-          </button>
-        </div>
-        <!-- Editor -->
-        <div id="editor-anotacao" contenteditable="true" class="flex-1 p-4 outline-none text-sm text-gray-700 overflow-y-auto" placeholder="Escreva suas anotações, observações ou problemas desta conciliação aqui..."></div>
-      </div>
-    </div>
-
-    <div class="flex items-center justify-between p-6 border-t border-gray-100 bg-white rounded-b-3xl">
-      <button onclick="limparAnotacao()" class="text-sm font-semibold text-red-500 hover:text-red-600 px-4 py-2 rounded-xl hover:bg-red-50 transition-colors">
-        Excluir
-      </button>
-      <div class="flex items-center gap-3">
-        <button onclick="fecharModalAnotacao()" class="px-6 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:border-gray-300 transition-colors">
-          Cancelar
-        </button>
-        <button onclick="salvarAnotacao()" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#038201] text-white font-bold text-sm shadow-[0_4px_12px_rgba(3,130,1,0.25)] hover:bg-[#026901] transition-all">
-          <i class="ph ph-floppy-disk text-lg"></i>
-          Salvar Anotação
+        <button onclick="hideToast()" class="ml-auto text-gray-300 hover:text-gray-500 transition-colors">
+          <i class="ph ph-x text-sm"></i>
         </button>
       </div>
     </div>
-  </div>
-</div>
 
-<script>
-  const state = { argos: [], bank: [] };
+    <!-- MODAL DE ANOTAÇÃO -->
+    <div id="modal-anotacao" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onclick="fecharModalAnotacao()">
+      </div>
+      <div
+        class="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-[slideUp_0.3s_ease-out_both]">
 
-  function handleDragOver(e, id) {
-    e.preventDefault(); e.stopPropagation();
-    document.getElementById(id).classList.add('drag-over');
-  }
-  function handleDragLeave(e, id) {
-    e.preventDefault(); e.stopPropagation();
-    document.getElementById(id).classList.remove('drag-over');
-  }
-  function handleDrop(e, type) {
-    e.preventDefault(); e.stopPropagation();
-    const id = type === 'argos' ? 'drop-argos' : 'drop-bank';
-    document.getElementById(id).classList.remove('drag-over');
-    const files = Array.from(e.dataTransfer.files).filter(isValidFile);
-    if (!files.length) { showToast('Formato inválido', 'Use arquivos .xlsx, .xls ou .csv', 'warning'); return; }
-    addFiles(type, files);
-  }
-  function handleFileInput(e, type) {
-    addFiles(type, Array.from(e.target.files).filter(isValidFile));
-    e.target.value = '';
-  }
-  function isValidFile(f) { return ['xlsx','xls','csv'].includes(f.name.split('.').pop().toLowerCase()); }
+        <div class="flex items-center justify-between p-6 border-b border-gray-100">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500">
+              <i class="ph ph-notebook text-xl"></i>
+            </div>
+            <div>
+              <h2 class="text-lg font-bold text-gray-800">Anotações da Conciliação</h2>
+              <p id="modal-anotacao-periodo" class="text-xs text-gray-400 font-medium">Período: 01/06 a 30/06</p>
+            </div>
+          </div>
+          <button onclick="fecharModalAnotacao()"
+            class="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-lg hover:bg-gray-50">
+            <i class="ph ph-x text-lg"></i>
+          </button>
+        </div>
 
-  function addFiles(type, files) {
-    const existing = new Set(state[type].map(f => f.name));
-    const newFiles = files.filter(f => !existing.has(f.name));
-    if (!newFiles.length) { showToast('Já adicionado', 'Esses arquivos já estão na lista.', 'info'); return; }
-    state[type].push(...newFiles);
-    renderFileList(type);
-    updateButton();
-    showToast(`${newFiles.length} arquivo(s) adicionado(s)`, newFiles.map(f => truncate(f.name)).join(', '), 'success');
-  }
+        <div class="p-6 flex-1 overflow-y-auto bg-gray-50/50">
+          <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden flex flex-col h-64">
+            <!-- Toolbar -->
+            <div class="flex items-center gap-2 p-2 border-b border-gray-100 bg-gray-50">
+              <button type="button" onclick="formatarAnotacao('hiliteColor', '#fef08a')"
+                class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-gray-600 hover:text-amber-500 transition-all"
+                title="Grifar (Amarelo)">
+                <i class="ph ph-highlighter-circle text-lg"></i>
+              </button>
+              <div class="w-px h-5 bg-gray-200 mx-1"></div>
+              <button type="button" onclick="formatarAnotacao('foreColor', '#ef4444')"
+                class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-red-500 transition-all"
+                title="Texto Vermelho">
+                <i class="ph ph-text-aa text-lg"></i>
+              </button>
+              <button type="button" onclick="formatarAnotacao('foreColor', '#22c55e')"
+                class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-green-500 transition-all"
+                title="Texto Verde">
+                <i class="ph ph-text-aa text-lg"></i>
+              </button>
+              <button type="button" onclick="formatarAnotacao('foreColor', '#3b82f6')"
+                class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-blue-500 transition-all"
+                title="Texto Azul">
+                <i class="ph ph-text-aa text-lg"></i>
+              </button>
+              <div class="w-px h-5 bg-gray-200 mx-1"></div>
+              <button type="button" onclick="formatarAnotacao('removeFormat')"
+                class="w-8 h-8 flex items-center justify-center rounded hover:bg-white border border-transparent hover:border-gray-200 text-gray-400 hover:text-gray-600 transition-all"
+                title="Remover Formatação">
+                <i class="ph ph-eraser text-lg"></i>
+              </button>
+            </div>
+            <!-- Editor -->
+            <div id="editor-anotacao" contenteditable="true"
+              class="flex-1 p-4 outline-none text-sm text-gray-700 overflow-y-auto"
+              placeholder="Escreva suas anotações, observações ou problemas desta conciliação aqui..."></div>
+          </div>
+        </div>
 
-  function removeFile(type, name) {
-    state[type] = state[type].filter(f => f.name !== name);
-    renderFileList(type); updateButton();
-  }
+        <div class="flex items-center justify-between p-6 border-t border-gray-100 bg-white rounded-b-3xl">
+          <button onclick="limparAnotacao()"
+            class="text-sm font-semibold text-red-500 hover:text-red-600 px-4 py-2 rounded-xl hover:bg-red-50 transition-colors">
+            Excluir
+          </button>
+          <div class="flex items-center gap-3">
+            <button onclick="fecharModalAnotacao()"
+              class="px-6 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:border-gray-300 transition-colors">
+              Cancelar
+            </button>
+            <button onclick="salvarAnotacao()"
+              class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#038201] text-white font-bold text-sm shadow-[0_4px_12px_rgba(3,130,1,0.25)] hover:bg-[#026901] transition-all">
+              <i class="ph ph-floppy-disk text-lg"></i>
+              Salvar Anotação
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
-  function renderFileList(type) {
-    const el = document.getElementById('list-' + type);
-    if (!state[type].length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
-    el.classList.remove('hidden');
-    el.innerHTML = state[type].map(f => `
+    <script>
+      const state = { argos: [], bank: [] };
+
+      function handleDragOver(e, id) {
+        e.preventDefault(); e.stopPropagation();
+        document.getElementById(id).classList.add('drag-over');
+      }
+      function handleDragLeave(e, id) {
+        e.preventDefault(); e.stopPropagation();
+        document.getElementById(id).classList.remove('drag-over');
+      }
+      function handleDrop(e, type) {
+        e.preventDefault(); e.stopPropagation();
+        const id = type === 'argos' ? 'drop-argos' : 'drop-bank';
+        document.getElementById(id).classList.remove('drag-over');
+        const files = Array.from(e.dataTransfer.files).filter(isValidFile);
+        if (!files.length) { showToast('Formato inválido', 'Use arquivos .xlsx, .xls ou .csv', 'warning'); return; }
+        addFiles(type, files);
+      }
+      function handleFileInput(e, type) {
+        addFiles(type, Array.from(e.target.files).filter(isValidFile));
+        e.target.value = '';
+      }
+      function isValidFile(f) { return ['xlsx', 'xls', 'csv'].includes(f.name.split('.').pop().toLowerCase()); }
+
+      function addFiles(type, files) {
+        const existing = new Set(state[type].map(f => f.name));
+        const newFiles = files.filter(f => !existing.has(f.name));
+        if (!newFiles.length) { showToast('Já adicionado', 'Esses arquivos já estão na lista.', 'info'); return; }
+        state[type].push(...newFiles);
+        renderFileList(type);
+        updateButton();
+        showToast(`${newFiles.length} arquivo(s) adicionado(s)`, newFiles.map(f => truncate(f.name)).join(', '), 'success');
+      }
+
+      function removeFile(type, name) {
+        state[type] = state[type].filter(f => f.name !== name);
+        renderFileList(type); updateButton();
+      }
+
+      function renderFileList(type) {
+        const el = document.getElementById('list-' + type);
+        if (!state[type].length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+        el.classList.remove('hidden');
+        el.innerHTML = state[type].map(f => `
       <div class="file-tag flex items-center gap-3 bg-green-50 border border-green-100 rounded-xl px-3 py-2.5">
         <i class="ph ph-file-xls text-[#038201] text-base flex-shrink-0"></i>
         <div class="min-w-0 flex-1">
@@ -615,416 +813,417 @@
           <i class="ph ph-x text-sm"></i>
         </button>
       </div>`).join('');
-  }
-
-  function updateButton() {
-    const btn = document.getElementById('btn-start');
-    const hint = document.getElementById('btn-hint');
-    const hasA = state.argos.length > 0, hasB = state.bank.length > 0;
-    if (hasA && hasB) {
-      btn.disabled = false;
-      btn.className = 'relative flex items-center gap-3 px-10 py-4 rounded-2xl font-bold text-base tracking-wide transition-all duration-300 bg-[#038201] text-white cursor-pointer shadow-[0_4px_24px_rgba(3,130,1,0.35)] hover:bg-[#026901] hover:shadow-[0_8px_32px_rgba(3,130,1,0.45)] hover:-translate-y-0.5';
-      hint.textContent = state.argos.length + ' arquivo(s) Argos · ' + state.bank.length + ' extrato(s) bancário(s) prontos';
-      hint.className = 'text-[#038201] text-xs font-medium transition-all duration-300';
-    } else {
-      btn.disabled = true;
-      btn.className = 'relative flex items-center gap-3 px-10 py-4 rounded-2xl font-bold text-base tracking-wide transition-all duration-300 bg-gray-300 text-gray-400 cursor-not-allowed';
-      hint.textContent = !hasA && !hasB ? 'Adicione pelo menos um arquivo de cada tipo para continuar'
-        : !hasA ? 'Falta: adicione pelo menos 1 arquivo do Sistema Argos'
-        : 'Falta: adicione pelo menos 1 extrato bancário';
-      hint.className = 'text-gray-400 text-xs transition-all duration-300';
-    }
-  }
-
-  // URL base da API — usa rota relativa para funcionar tanto localmente quanto no Render
-  const API_BASE = '';
-
-  const STEPS = [
-    {pct:15, label:'Enviando arquivos para o servidor...'},
-    {pct:30, label:'Lendo e limpando dados do Argos...'},
-    {pct:50, label:'Regra 1: Match Exato em execução...'},
-    {pct:70, label:'Regra 2: Análise de Histórico (Regex)...'},
-    {pct:88, label:'Regra 3: Combinação de Valores Desmembrados...'},
-    {pct:98, label:'Gerando planilha de resultados...'},
-  ];
-
-  // Armazena o Blob do Excel retornado pela API para o botão de download
-  let _excelBlob = null;
-  let _resultados = null;
-  let _currentId = null;
-  let _currentPeriodo = '';
-
-  async function startReconciliation() {
-    showView('loading');
-    _excelBlob = null;
-    _resultados = null;
-
-    // Anima a barra de progresso enquanto a API processa
-    const bar=document.getElementById('progress-bar');
-    const pctEl=document.getElementById('progress-pct');
-    const lbl=document.getElementById('progress-label');
-    let stepIdx=0;
-    let progressTimer;
-
-    const advanceStep = () => {
-      if(stepIdx>=STEPS.length) return;
-      const s=STEPS[stepIdx];
-      bar.style.width=s.pct+'%'; pctEl.textContent=s.pct+'%'; lbl.textContent=s.label;
-      if(s.pct>=50) activateStep('step-1');
-      if(s.pct>=70) activateStep('step-2');
-      if(s.pct>=88) activateStep('step-3');
-      stepIdx++;
-      if(stepIdx<STEPS.length) progressTimer=setTimeout(advanceStep,700);
-    };
-    setTimeout(advanceStep,300);
-
-    try {
-      // Monta o FormData com todos os arquivos
-      const form = new FormData();
-      state.argos.forEach(f => form.append('argos_files', f));
-      state.bank.forEach(f  => form.append('banco_files', f));
-
-      // Lê o banco selecionado no select (se existir)
-      const bancoSelect = document.getElementById('select-banco');
-      const bancoNome = bancoSelect ? bancoSelect.value : 'generico';
-      form.append('banco_nome', bancoNome);
-
-      // Chama a API — pode levar vários segundos dependendo do volume
-      const resp = await fetch(API_BASE + '/api/conciliar', {
-        method: 'POST',
-        body: form,
-      });
-
-      clearTimeout(progressTimer);
-
-      if(!resp.ok) {
-        // Tenta ler a mensagem de erro do servidor
-        let msg = 'Erro desconhecido no servidor.';
-        try {
-          const errJson = await resp.json();
-          msg = errJson.detail || msg;
-        } catch(_) {}
-        throw new Error(msg);
       }
 
-      // Sucesso: recebe o JSON com resultados + arquivo em Base64
-      const dados = await resp.json();
-      _currentId = dados.id_historico;
-      _currentPeriodo = dados.periodo;
-
-      // Log de depuração — confirma o contrato do JSON recebido
-      console.log('[API] JSON recebido:', JSON.stringify({
-        resultados: dados.resultados,
-        taxa_conciliacao: dados.taxa_conciliacao,
-        total_registros: dados.total_registros,
-        ficheiro_base64_length: dados.ficheiro_base64 ? dados.ficheiro_base64.length : 0,
-      }));
-
-      // Valida que a chave "resultados" existe no JSON
-      if (!dados.resultados) {
-        throw new Error('Resposta da API inválida: chave "resultados" ausente. Verifique o console.');
-      }
-
-      // Extrai resultados (chave aninhada, conforme contrato)
-      const res = dados.resultados;
-      _resultados = {
-        perfeitos:    Number(res.perfeitos    ?? 0),
-        historico:    Number(res.historico    ?? 0),
-        desmembrados: Number(res.desmembrados ?? 0),
-        saidas_estornos: Number(res.saidas_estornos ?? 0),
-        divergencias: Number(res.divergencias ?? 0),
-      };
-
-      // Cálculo da porcentagem conforme especificação
-      const sucesso = _resultados.perfeitos + _resultados.historico + _resultados.desmembrados + _resultados.saidas_estornos;
-      const totalCalcFetch = sucesso + _resultados.divergencias;
-      const percentagem = totalCalcFetch > 0
-        ? Math.round((sucesso / totalCalcFetch) * 100)
-        : 0;
-      console.log(`[API] Sucesso: ${sucesso} / Total: ${totalCalcFetch} = ${percentagem}%`);
-
-      // Converte Base64 → Blob usando Array (previne corrupção em alguns navegadores)
-      const byteCharacters = atob(dados.ficheiro_base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      _excelBlob = new Blob(
-        [byteArray],
-        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
-      );
-
-      // Completa a barra de progresso
-      bar.style.width='100%'; pctEl.textContent='100%';
-      lbl.textContent='Conciliação concluída! Preparando resultados...';
-      activateStep('step-1'); activateStep('step-2'); activateStep('step-3');
-
-      setTimeout(() => {
-        _preencherResultados(_resultados, percentagem, totalCalcFetch);
-        document.getElementById('periodo-text').textContent = _currentPeriodo || 'Desconhecido';
-        showView('results');
-      }, 600);
-
-    } catch(err) {
-      clearTimeout(progressTimer);
-      showView('upload');
-      showToast(
-        'Erro na conciliação',
-        err.message || 'Verifique se o servidor app.py está em execução.',
-        'error'
-      );
-      console.error('[API Error]', err);
-    }
-  }
-
-  /**
-   * Preenche os KPIs de resultado com dados reais da API.
-   *
-   * @param {Object} res        - { perfeitos, historico, desmembrados, divergencias } (já numérico)
-   * @param {number} percentagem - Porcentagem pré-calculada no fetch (Math.round inteiro)
-   * @param {number} total       - Total de registros processados
-   */
-  function _preencherResultados(res, percentagem, total) {
-    if (!res) { console.warn('[KPI] _preencherResultados chamado sem dados.'); return; }
-
-    console.log('[KPI] Preenchendo cartões:', res, '| Pct:', percentagem, '| Total:', total);
-
-    // 1. Preenche os 5 cartões com valores numéricos garantidos
-    const mapa = [
-      { campo: 'perfeitos',     id: 'kpi-perfeito'     },
-      { campo: 'historico',     id: 'kpi-historico'    },
-      { campo: 'desmembrados',  id: 'kpi-desmembrado'  },
-      { campo: 'saidas_estornos',id: 'kpi-saidas'      },
-      { campo: 'divergencias',  id: 'kpi-divergencias' },
-    ];
-    mapa.forEach(({ campo, id }) => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.textContent = Number(res[campo] ?? 0);
-      } else {
-        console.warn(`[KPI] Elemento #${id} não encontrado no DOM.`);
-      }
-    });
-
-    // 2. Total de registros no banner
-    const elTotal = document.getElementById('kpi-total');
-    if (elTotal) {
-      elTotal.textContent = total + ' registros processados · Planilha pronta para download';
-    }
-
-    // 3. Porcentagem pré-calculada no fetch (inteiro, sem casa decimal)
-    const pctDisplay = percentagem + '%';
-    const elTaxa = document.getElementById('kpi-taxa');
-    if (elTaxa) elTaxa.textContent = pctDisplay;
-    const elTaxaBarra = document.getElementById('kpi-taxa-barra');
-    if (elTaxaBarra) elTaxaBarra.textContent = pctDisplay;
-
-    // 4. Atualiza a barra de distribuição visual proporcional
-    const perfeitos    = res.perfeitos    || 0;
-    const historico    = res.historico    || 0;
-    const desmembrados = res.desmembrados || 0;
-    const saidas       = res.saidas_estornos || 0;
-    const divergencias = res.divergencias || 0;
-    const totalCalc    = perfeitos + historico + desmembrados + saidas + divergencias;
-
-    if (totalCalc > 0) {
-      const pPerf = ((perfeitos    / totalCalc) * 100).toFixed(1);
-      const pHist = ((historico    / totalCalc) * 100).toFixed(1);
-      const pDesm = ((desmembrados / totalCalc) * 100).toFixed(1);
-      const pSaid = ((saidas       / totalCalc) * 100).toFixed(1);
-      const pDiv  = ((divergencias / totalCalc) * 100).toFixed(1);
-
-      const bars = document.querySelectorAll('#barra-dist > div');
-      if (bars.length === 5) {
-        bars[0].style.width = pPerf + '%'; bars[0].title = `Perfeitos: ${perfeitos} (${pPerf}%)`;
-        bars[1].style.width = pHist + '%'; bars[1].title = `Via Histórico: ${historico} (${pHist}%)`;
-        bars[2].style.width = pDesm + '%'; bars[2].title = `Desmembrados: ${desmembrados} (${pDesm}%)`;
-        bars[3].style.width = pSaid + '%'; bars[3].title = `Saídas/Estornos: ${saidas} (${pSaid}%)`;
-        bars[4].style.width = pDiv  + '%'; bars[4].title = `Divergências: ${divergencias} (${pDiv}%)`;
-      }
-
-      // Atualiza os textos de legenda (spans de texto, não os círculos coloridos)
-      const legs = document.querySelectorAll('.legenda-dist > div > span:last-child');
-      if (legs.length === 5) {
-        legs[0].textContent = `Perfeitos (${pPerf}%)`;
-        legs[1].textContent = `Via Histórico (${pHist}%)`;
-        legs[2].textContent = `Desmembrados (${pDesm}%)`;
-        legs[3].textContent = `Saídas/Estornos (${pSaid}%)`;
-        legs[4].textContent = `Divergências (${pDiv}%)`;
-      }
-    }
-  }
-
-  function activateStep(id) {
-    const el=document.getElementById(id);
-    el.classList.remove('opacity-40'); el.classList.add('opacity-100','border-green-200','bg-green-50');
-  }
-
-  function showView(view) {
-    ['upload','loading','results','historico'].forEach(v=>{
-      const el = document.getElementById('view-'+v);
-      if (el) el.classList[v===view?'remove':'add']('hidden');
-    });
-  }
-
-  function resetApp(silent = false) {
-    state.argos=[]; state.bank=[];
-    _excelBlob = null;
-    _resultados = null;
-    _currentId = null;
-    _currentPeriodo = '';
-    renderFileList('argos'); renderFileList('bank'); updateButton();
-    document.getElementById('progress-bar').style.width='0%';
-    document.getElementById('progress-pct').textContent='0%';
-    document.getElementById('progress-label').textContent='Iniciando leitura dos arquivos';
-    ['step-1','step-2','step-3'].forEach(id=>{
-      const el=document.getElementById(id);
-      el.classList.add('opacity-40'); el.classList.remove('opacity-100','border-green-200','bg-green-50');
-    });
-    showView('upload');
-    if(silent !== true) showToast('Pronto!','Os campos foram limpos com sucesso.','info');
-  }
-
-  function triggerDownload() {
-    if (!_excelBlob) {
-      if (_currentId) {
-        downloadHistorico(_currentId);
-      } else {
-        showToast('Arquivo indisponível', 'Execute a conciliação primeiro.', 'warning');
-      }
-      return;
-    }
-    // Constrói o link de download a partir do Blob .xlsx (Base64 → Blob já feito no fetch)
-    const url = URL.createObjectURL(_excelBlob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'Conciliacao_Final.xlsx';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);   // remove o elemento do DOM imediatamente
-    URL.revokeObjectURL(url);       // libera memória do Object URL
-    showToast('Download iniciado!', 'Conciliacao_Final.xlsx foi salvo com sucesso.', 'success');
-  }
-
-  async function downloadHistorico(id) {
-    showToast('Aguarde...', 'Preparando o download do arquivo.', 'info');
-    try {
-      // Usamos fetch normal, que cai no nosso interceptador e adiciona o token Bearer
-      const response = await fetch(API_BASE + '/api/download/' + id);
-      
-      if (!response.ok) {
-        throw new Error('Não foi possível baixar o arquivo.');
-      }
-      
-      // Extrai o Blob da resposta
-      const blob = await response.blob();
-      
-      // Tenta obter o nome do arquivo a partir dos cabeçalhos, se possível
-      let filename = 'Conciliacao_Historico.xlsx';
-      const disposition = response.headers.get('content-disposition');
-      if (disposition && disposition.indexOf('filename=') !== -1) {
-        const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
-        if (matches != null && matches[1]) { 
-          filename = matches[1].replace(/['"]/g, '');
+      function updateButton() {
+        const btn = document.getElementById('btn-start');
+        const hint = document.getElementById('btn-hint');
+        const hasA = state.argos.length > 0, hasB = state.bank.length > 0;
+        if (hasA && hasB) {
+          btn.disabled = false;
+          btn.className = 'relative flex items-center gap-3 px-10 py-4 rounded-2xl font-bold text-base tracking-wide transition-all duration-300 bg-[#038201] text-white cursor-pointer shadow-[0_4px_24px_rgba(3,130,1,0.35)] hover:bg-[#026901] hover:shadow-[0_8px_32px_rgba(3,130,1,0.45)] hover:-translate-y-0.5';
+          hint.textContent = state.argos.length + ' arquivo(s) Argos · ' + state.bank.length + ' extrato(s) bancário(s) prontos';
+          hint.className = 'text-[#038201] text-xs font-medium transition-all duration-300';
+        } else {
+          btn.disabled = true;
+          btn.className = 'relative flex items-center gap-3 px-10 py-4 rounded-2xl font-bold text-base tracking-wide transition-all duration-300 bg-gray-300 text-gray-400 cursor-not-allowed';
+          hint.textContent = !hasA && !hasB ? 'Adicione pelo menos um arquivo de cada tipo para continuar'
+            : !hasA ? 'Falta: adicione pelo menos 1 arquivo do Sistema Argos'
+              : 'Falta: adicione pelo menos 1 extrato bancário';
+          hint.className = 'text-gray-400 text-xs transition-all duration-300';
         }
       }
 
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      
-      showToast('Sucesso!', 'Download concluído.', 'success');
-    } catch(err) {
-      showToast('Erro no download', err.message, 'error');
-    }
-  }
+      // URL base da API — usa rota relativa para funcionar tanto localmente quanto no Render
+      const API_BASE = '';
 
-  let toastTimer=null;
-  function showToast(title,body,type='success'){
-    const el=document.getElementById('toast'),icon=document.getElementById('toast-icon');
-    const cfg={success:{i:'ph-check-circle',c:'text-[#038201]'},warning:{i:'ph-warning',c:'text-amber-500'},info:{i:'ph-info',c:'text-blue-500'},error:{i:'ph-x-circle',c:'text-red-500'}};
-    const c=cfg[type]||cfg.success;
-    icon.className=`ph ${c.i} ${c.c} text-xl flex-shrink-0 mt-0.5`;
-    document.getElementById('toast-title').textContent=title;
-    document.getElementById('toast-body').textContent=body;
-    el.classList.remove('hidden');
-    if(toastTimer) clearTimeout(toastTimer);
-    toastTimer=setTimeout(hideToast,4000);
-  }
-  function hideToast(){ document.getElementById('toast').classList.add('hidden'); }
+      const STEPS = [
+        { pct: 15, label: 'Enviando arquivos para o servidor...' },
+        { pct: 30, label: 'Lendo e limpando dados do Argos...' },
+        { pct: 50, label: 'Regra 1: Match Exato em execução...' },
+        { pct: 70, label: 'Regra 2: Análise de Histórico (Regex)...' },
+        { pct: 88, label: 'Regra 3: Combinação de Valores Desmembrados...' },
+        { pct: 98, label: 'Gerando planilha de resultados...' },
+      ];
 
-  function fmtSize(b){ return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'; }
-  function truncate(s){ return s.length>38?s.slice(0,35)+'...':s; }
-  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+      // Armazena o Blob do Excel retornado pela API para o botão de download
+      let _excelBlob = null;
+      let _resultados = null;
+      let _currentId = null;
+      let _currentPeriodo = '';
 
-  updateButton();
+      async function startReconciliation() {
+        showView('loading');
+        _excelBlob = null;
+        _resultados = null;
 
-  // ----- FUNCIONALIDADE DAS ABAS E HISTÓRICO -----
-  let chartTaxaInstance = null;
-  let chartBarrasInstance = null;
+        // Anima a barra de progresso enquanto a API processa
+        const bar = document.getElementById('progress-bar');
+        const pctEl = document.getElementById('progress-pct');
+        const lbl = document.getElementById('progress-label');
+        let stepIdx = 0;
+        let progressTimer;
 
-  async function switchTab(tab) {
-    const isNova = tab === 'nova';
-    document.getElementById('tab-nova').className = isNova 
-      ? 'border-b-2 border-[#038201] text-[#038201] py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none'
-      : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none';
-    
-    document.getElementById('tab-historico').className = !isNova 
-      ? 'border-b-2 border-[#038201] text-[#038201] py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none'
-      : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none';
+        const advanceStep = () => {
+          if (stepIdx >= STEPS.length) return;
+          const s = STEPS[stepIdx];
+          bar.style.width = s.pct + '%'; pctEl.textContent = s.pct + '%'; lbl.textContent = s.label;
+          if (s.pct >= 50) activateStep('step-1');
+          if (s.pct >= 70) activateStep('step-2');
+          if (s.pct >= 88) activateStep('step-3');
+          stepIdx++;
+          if (stepIdx < STEPS.length) progressTimer = setTimeout(advanceStep, 700);
+        };
+        setTimeout(advanceStep, 300);
 
-    if (isNova) {
-      resetApp(true);
-    } else {
-      showView('historico');
-      await fetchHistorico();
-    }
-  }
+        try {
+          // Monta o FormData com todos os arquivos
+          const form = new FormData();
+          state.argos.forEach(f => form.append('argos_files', f));
+          state.bank.forEach(f => form.append('banco_files', f));
 
-  async function fetchHistorico() {
-    try {
-      const resp = await fetch(API_BASE + '/api/historico');
-      if (!resp.ok) throw new Error('Falha ao carregar histórico.');
-      const data = await resp.json();
-      renderHistorico(data);
-    } catch(err) {
-      console.error(err);
-      showToast('Erro', 'Não foi possível carregar o histórico.', 'error');
-    }
-  }
+          // Lê o banco selecionado no select (se existir)
+          const bancoSelect = document.getElementById('select-banco');
+          const bancoNome = bancoSelect ? bancoSelect.value : 'generico';
+          form.append('banco_nome', bancoNome);
 
-  function renderHistorico(data) {
-    const tbody = document.getElementById('tabela-historico');
-    const chartsContainer = document.getElementById('charts-container');
-    const emptyState = document.getElementById('historico-empty');
+          // Chama a API — pode levar vários segundos dependendo do volume
+          const resp = await fetch(API_BASE + '/api/conciliar', {
+            method: 'POST',
+            body: form,
+          });
 
-    if (!data || data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-gray-400">Nenhum histórico encontrado.</td></tr>';
-      if (chartsContainer) chartsContainer.classList.add('hidden');
-      if (emptyState) emptyState.classList.remove('hidden');
-      return;
-    }
+          clearTimeout(progressTimer);
 
-    if (chartsContainer) chartsContainer.classList.remove('hidden');
-    if (emptyState) emptyState.classList.add('hidden');
+          if (!resp.ok) {
+            // Tenta ler a mensagem de erro do servidor
+            let msg = 'Erro desconhecido no servidor.';
+            try {
+              const errJson = await resp.json();
+              msg = errJson.detail || msg;
+            } catch (_) { }
+            throw new Error(msg);
+          }
 
-    window.historicoData = data; // Armazena globalmente para usar nas anotações
+          // Sucesso: recebe o JSON com resultados + arquivo em Base64
+          const dados = await resp.json();
+          _currentId = dados.id_historico;
+          _currentPeriodo = dados.periodo;
 
-    // Popula a tabela
-    tbody.innerHTML = data.map(row => {
-      const d = new Date(row.data_processamento);
-      const dataFormatada = d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-      const saidas = row.saidas_estornos || 0;
-      const conciliados = row.perfeitos + row.historico + row.desmembrados + saidas;
-      const sucesso = (row.taxa_sucesso || 0).toFixed(1);
-      return `
+          // Log de depuração — confirma o contrato do JSON recebido
+          console.log('[API] JSON recebido:', JSON.stringify({
+            resultados: dados.resultados,
+            taxa_conciliacao: dados.taxa_conciliacao,
+            total_registros: dados.total_registros,
+            ficheiro_base64_length: dados.ficheiro_base64 ? dados.ficheiro_base64.length : 0,
+          }));
+
+          // Valida que a chave "resultados" existe no JSON
+          if (!dados.resultados) {
+            throw new Error('Resposta da API inválida: chave "resultados" ausente. Verifique o console.');
+          }
+
+          // Extrai resultados (chave aninhada, conforme contrato)
+          const res = dados.resultados;
+          _resultados = {
+            perfeitos: Number(res.perfeitos ?? 0),
+            historico: Number(res.historico ?? 0),
+            desmembrados: Number(res.desmembrados ?? 0),
+            saidas_estornos: Number(res.saidas_estornos ?? 0),
+            divergencias: Number(res.divergencias ?? 0),
+          };
+
+          // Cálculo da porcentagem conforme especificação
+          const sucesso = _resultados.perfeitos + _resultados.historico + _resultados.desmembrados + _resultados.saidas_estornos;
+          const totalCalcFetch = sucesso + _resultados.divergencias;
+          const percentagem = totalCalcFetch > 0
+            ? Math.round((sucesso / totalCalcFetch) * 100)
+            : 0;
+          console.log(`[API] Sucesso: ${sucesso} / Total: ${totalCalcFetch} = ${percentagem}%`);
+
+          // Converte Base64 → Blob usando Array (previne corrupção em alguns navegadores)
+          const byteCharacters = atob(dados.ficheiro_base64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          _excelBlob = new Blob(
+            [byteArray],
+            { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+          );
+
+          // Completa a barra de progresso
+          bar.style.width = '100%'; pctEl.textContent = '100%';
+          lbl.textContent = 'Conciliação concluída! Preparando resultados...';
+          activateStep('step-1'); activateStep('step-2'); activateStep('step-3');
+
+          setTimeout(() => {
+            _preencherResultados(_resultados, percentagem, totalCalcFetch);
+            document.getElementById('periodo-text').textContent = _currentPeriodo || 'Desconhecido';
+            showView('results');
+          }, 600);
+
+        } catch (err) {
+          clearTimeout(progressTimer);
+          showView('upload');
+          showToast(
+            'Erro na conciliação',
+            err.message || 'Verifique se o servidor app.py está em execução.',
+            'error'
+          );
+          console.error('[API Error]', err);
+        }
+      }
+
+      /**
+       * Preenche os KPIs de resultado com dados reais da API.
+       *
+       * @param {Object} res        - { perfeitos, historico, desmembrados, divergencias } (já numérico)
+       * @param {number} percentagem - Porcentagem pré-calculada no fetch (Math.round inteiro)
+       * @param {number} total       - Total de registros processados
+       */
+      function _preencherResultados(res, percentagem, total) {
+        if (!res) { console.warn('[KPI] _preencherResultados chamado sem dados.'); return; }
+
+        console.log('[KPI] Preenchendo cartões:', res, '| Pct:', percentagem, '| Total:', total);
+
+        // 1. Preenche os 5 cartões com valores numéricos garantidos
+        const mapa = [
+          { campo: 'perfeitos', id: 'kpi-perfeito' },
+          { campo: 'historico', id: 'kpi-historico' },
+          { campo: 'desmembrados', id: 'kpi-desmembrado' },
+          { campo: 'saidas_estornos', id: 'kpi-saidas' },
+          { campo: 'divergencias', id: 'kpi-divergencias' },
+        ];
+        mapa.forEach(({ campo, id }) => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.textContent = Number(res[campo] ?? 0);
+          } else {
+            console.warn(`[KPI] Elemento #${id} não encontrado no DOM.`);
+          }
+        });
+
+        // 2. Total de registros no banner
+        const elTotal = document.getElementById('kpi-total');
+        if (elTotal) {
+          elTotal.textContent = total + ' registros processados · Planilha pronta para download';
+        }
+
+        // 3. Porcentagem pré-calculada no fetch (inteiro, sem casa decimal)
+        const pctDisplay = percentagem + '%';
+        const elTaxa = document.getElementById('kpi-taxa');
+        if (elTaxa) elTaxa.textContent = pctDisplay;
+        const elTaxaBarra = document.getElementById('kpi-taxa-barra');
+        if (elTaxaBarra) elTaxaBarra.textContent = pctDisplay;
+
+        // 4. Atualiza a barra de distribuição visual proporcional
+        const perfeitos = res.perfeitos || 0;
+        const historico = res.historico || 0;
+        const desmembrados = res.desmembrados || 0;
+        const saidas = res.saidas_estornos || 0;
+        const divergencias = res.divergencias || 0;
+        const totalCalc = perfeitos + historico + desmembrados + saidas + divergencias;
+
+        if (totalCalc > 0) {
+          const pPerf = ((perfeitos / totalCalc) * 100).toFixed(1);
+          const pHist = ((historico / totalCalc) * 100).toFixed(1);
+          const pDesm = ((desmembrados / totalCalc) * 100).toFixed(1);
+          const pSaid = ((saidas / totalCalc) * 100).toFixed(1);
+          const pDiv = ((divergencias / totalCalc) * 100).toFixed(1);
+
+          const bars = document.querySelectorAll('#barra-dist > div');
+          if (bars.length === 5) {
+            bars[0].style.width = pPerf + '%'; bars[0].title = `Perfeitos: ${perfeitos} (${pPerf}%)`;
+            bars[1].style.width = pHist + '%'; bars[1].title = `Via Histórico: ${historico} (${pHist}%)`;
+            bars[2].style.width = pDesm + '%'; bars[2].title = `Desmembrados: ${desmembrados} (${pDesm}%)`;
+            bars[3].style.width = pSaid + '%'; bars[3].title = `Saídas/Estornos: ${saidas} (${pSaid}%)`;
+            bars[4].style.width = pDiv + '%'; bars[4].title = `Divergências: ${divergencias} (${pDiv}%)`;
+          }
+
+          // Atualiza os textos de legenda (spans de texto, não os círculos coloridos)
+          const legs = document.querySelectorAll('.legenda-dist > div > span:last-child');
+          if (legs.length === 5) {
+            legs[0].textContent = `Perfeitos (${pPerf}%)`;
+            legs[1].textContent = `Via Histórico (${pHist}%)`;
+            legs[2].textContent = `Desmembrados (${pDesm}%)`;
+            legs[3].textContent = `Saídas/Estornos (${pSaid}%)`;
+            legs[4].textContent = `Divergências (${pDiv}%)`;
+          }
+        }
+      }
+
+      function activateStep(id) {
+        const el = document.getElementById(id);
+        el.classList.remove('opacity-40'); el.classList.add('opacity-100', 'border-green-200', 'bg-green-50');
+      }
+
+      function showView(view) {
+        ['upload', 'loading', 'results', 'historico'].forEach(v => {
+          const el = document.getElementById('view-' + v);
+          if (el) el.classList[v === view ? 'remove' : 'add']('hidden');
+        });
+      }
+
+      function resetApp(silent = false) {
+        state.argos = []; state.bank = [];
+        _excelBlob = null;
+        _resultados = null;
+        _currentId = null;
+        _currentPeriodo = '';
+        renderFileList('argos'); renderFileList('bank'); updateButton();
+        document.getElementById('progress-bar').style.width = '0%';
+        document.getElementById('progress-pct').textContent = '0%';
+        document.getElementById('progress-label').textContent = 'Iniciando leitura dos arquivos';
+        ['step-1', 'step-2', 'step-3'].forEach(id => {
+          const el = document.getElementById(id);
+          el.classList.add('opacity-40'); el.classList.remove('opacity-100', 'border-green-200', 'bg-green-50');
+        });
+        showView('upload');
+        if (silent !== true) showToast('Pronto!', 'Os campos foram limpos com sucesso.', 'info');
+      }
+
+      function triggerDownload() {
+        if (!_excelBlob) {
+          if (_currentId) {
+            downloadHistorico(_currentId);
+          } else {
+            showToast('Arquivo indisponível', 'Execute a conciliação primeiro.', 'warning');
+          }
+          return;
+        }
+        // Constrói o link de download a partir do Blob .xlsx (Base64 → Blob já feito no fetch)
+        const url = URL.createObjectURL(_excelBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Conciliacao_Final.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);   // remove o elemento do DOM imediatamente
+        URL.revokeObjectURL(url);       // libera memória do Object URL
+        showToast('Download iniciado!', 'Conciliacao_Final.xlsx foi salvo com sucesso.', 'success');
+      }
+
+      async function downloadHistorico(id) {
+        showToast('Aguarde...', 'Preparando o download do arquivo.', 'info');
+        try {
+          // Usamos fetch normal, que cai no nosso interceptador e adiciona o token Bearer
+          const response = await fetch(API_BASE + '/api/download/' + id);
+
+          if (!response.ok) {
+            throw new Error('Não foi possível baixar o arquivo.');
+          }
+
+          // Extrai o Blob da resposta
+          const blob = await response.blob();
+
+          // Tenta obter o nome do arquivo a partir dos cabeçalhos, se possível
+          let filename = 'Conciliacao_Historico.xlsx';
+          const disposition = response.headers.get('content-disposition');
+          if (disposition && disposition.indexOf('filename=') !== -1) {
+            const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+            if (matches != null && matches[1]) {
+              filename = matches[1].replace(/['"]/g, '');
+            }
+          }
+
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+
+          showToast('Sucesso!', 'Download concluído.', 'success');
+        } catch (err) {
+          showToast('Erro no download', err.message, 'error');
+        }
+      }
+
+      let toastTimer = null;
+      function showToast(title, body, type = 'success') {
+        const el = document.getElementById('toast'), icon = document.getElementById('toast-icon');
+        const cfg = { success: { i: 'ph-check-circle', c: 'text-[#038201]' }, warning: { i: 'ph-warning', c: 'text-amber-500' }, info: { i: 'ph-info', c: 'text-blue-500' }, error: { i: 'ph-x-circle', c: 'text-red-500' } };
+        const c = cfg[type] || cfg.success;
+        icon.className = `ph ${c.i} ${c.c} text-xl flex-shrink-0 mt-0.5`;
+        document.getElementById('toast-title').textContent = title;
+        document.getElementById('toast-body').textContent = body;
+        el.classList.remove('hidden');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(hideToast, 4000);
+      }
+      function hideToast() { document.getElementById('toast').classList.add('hidden'); }
+
+      function fmtSize(b) { return b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(1) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
+      function truncate(s) { return s.length > 38 ? s.slice(0, 35) + '...' : s; }
+      function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
+
+      updateButton();
+
+      // ----- FUNCIONALIDADE DAS ABAS E HISTÓRICO -----
+      let chartTaxaInstance = null;
+      let chartBarrasInstance = null;
+
+      async function switchTab(tab) {
+        const isNova = tab === 'nova';
+        document.getElementById('tab-nova').className = isNova
+          ? 'border-b-2 border-[#038201] text-[#038201] py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none'
+          : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none';
+
+        document.getElementById('tab-historico').className = !isNova
+          ? 'border-b-2 border-[#038201] text-[#038201] py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none'
+          : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none';
+
+        if (isNova) {
+          resetApp(true);
+        } else {
+          showView('historico');
+          await fetchHistorico();
+        }
+      }
+
+      async function fetchHistorico() {
+        try {
+          const resp = await fetch(API_BASE + '/api/historico');
+          if (!resp.ok) throw new Error('Falha ao carregar histórico.');
+          const data = await resp.json();
+          renderHistorico(data);
+        } catch (err) {
+          console.error(err);
+          showToast('Erro', 'Não foi possível carregar o histórico.', 'error');
+        }
+      }
+
+      function renderHistorico(data) {
+        const tbody = document.getElementById('tabela-historico');
+        const chartsContainer = document.getElementById('charts-container');
+        const emptyState = document.getElementById('historico-empty');
+
+        if (!data || data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-gray-400">Nenhum histórico encontrado.</td></tr>';
+          if (chartsContainer) chartsContainer.classList.add('hidden');
+          if (emptyState) emptyState.classList.remove('hidden');
+          return;
+        }
+
+        if (chartsContainer) chartsContainer.classList.remove('hidden');
+        if (emptyState) emptyState.classList.add('hidden');
+
+        window.historicoData = data; // Armazena globalmente para usar nas anotações
+
+        // Popula a tabela
+        tbody.innerHTML = data.map(row => {
+          const d = new Date(row.data_processamento);
+          const dataFormatada = d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          const saidas = row.saidas_estornos || 0;
+          const conciliados = row.perfeitos + row.historico + row.desmembrados + saidas;
+          const sucesso = (row.taxa_sucesso || 0).toFixed(1);
+          return `
         <tr class="hover:bg-gray-50 transition-colors">
+          <td class="py-4 px-6 text-center"><input type="checkbox" class="history-checkbox" value="${row.id}" onchange="updateBulkDeleteBtn()"></td>
           <td class="py-4 px-6 text-gray-800 font-medium whitespace-nowrap">${dataFormatada}</td>
           <td class="py-4 px-6 text-gray-500 text-xs font-medium whitespace-nowrap">
             <div id="td-periodo-view-${row.id}" class="flex items-center gap-2">
@@ -1068,367 +1267,413 @@
           </td>
         </tr>
       `;
-    }).join('');
+        }).join('');
 
-    // Prepara dados para os gráficos (últimos 10 registros cronológicos)
-    const ultimos = data.slice(0, 10).reverse();
-    const labels = ultimos.map(r => r.periodo || 'Desconhecido');
-    const taxas = ultimos.map(r => r.taxa_sucesso || 0);
-    const conciliaArr = ultimos.map(r => r.perfeitos + r.historico + r.desmembrados + (r.saidas_estornos || 0));
-    const divArr = ultimos.map(r => r.divergencias);
+        // Prepara dados para os gráficos (últimos 10 registros cronológicos)
+        const ultimos = data.slice(0, 10).reverse();
+        const labels = ultimos.map(r => r.periodo || 'Desconhecido');
+        const taxas = ultimos.map(r => r.taxa_sucesso || 0);
+        const conciliaArr = ultimos.map(r => r.perfeitos + r.historico + r.desmembrados + (r.saidas_estornos || 0));
+        const divArr = ultimos.map(r => r.divergencias);
 
-    // Gráfico 1: Linha
-    const ctxTaxa = document.getElementById('chart-taxa').getContext('2d');
-    if (chartTaxaInstance) chartTaxaInstance.destroy();
-    chartTaxaInstance = new Chart(ctxTaxa, {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Taxa de Sucesso (%)', data: taxas,
-          borderColor: '#038201', backgroundColor: 'rgba(3,130,1,0.1)',
-          fill: true, tension: 0.4, borderWidth: 3,
-          pointBackgroundColor: '#038201', pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6
-        }]
-      },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100 } } }
-    });
+        // Gráfico 1: Linha
+        const ctxTaxa = document.getElementById('chart-taxa').getContext('2d');
+        if (chartTaxaInstance) chartTaxaInstance.destroy();
+        chartTaxaInstance = new Chart(ctxTaxa, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Taxa de Sucesso (%)', data: taxas,
+              borderColor: '#038201', backgroundColor: 'rgba(3,130,1,0.1)',
+              fill: true, tension: 0.4, borderWidth: 3,
+              pointBackgroundColor: '#038201', pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6
+            }]
+          },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100 } } }
+        });
 
-    // Gráfico 2: Barras Empilhadas
-    const ctxBarras = document.getElementById('chart-barras').getContext('2d');
-    if (chartBarrasInstance) chartBarrasInstance.destroy();
-    chartBarrasInstance = new Chart(ctxBarras, {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [
-          { label: 'Conciliados', data: conciliaArr, backgroundColor: '#038201', borderRadius: 4 },
-          { label: 'Divergências', data: divArr, backgroundColor: '#f59e0b', borderRadius: 4 }
-        ]
-      },
-      options: { 
-        responsive: true, maintainAspectRatio: false, 
-        plugins: { legend: { position: 'bottom' } }, 
-        scales: { x: { stacked: true }, y: { stacked: true } } 
+        // Gráfico 2: Barras Empilhadas
+        const ctxBarras = document.getElementById('chart-barras').getContext('2d');
+        if (chartBarrasInstance) chartBarrasInstance.destroy();
+        chartBarrasInstance = new Chart(ctxBarras, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'Conciliados', data: conciliaArr, backgroundColor: '#038201', borderRadius: 4 },
+              { label: 'Divergências', data: divArr, backgroundColor: '#f59e0b', borderRadius: 4 }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+            scales: { x: { stacked: true }, y: { stacked: true } }
+          }
+        });
       }
-    });
-  }
 
-  async function excluirHistorico(id) {
-    if (!confirm('Tem certeza que deseja excluir o histórico desta conciliação?')) return;
-    try {
-      const resp = await fetch(API_BASE + '/api/historico/' + id, { method: 'DELETE' });
-      if (!resp.ok) throw new Error('Falha ao excluir histórico.');
-      showToast('Sucesso', 'Histórico e arquivo excluídos com sucesso.', 'success');
-      fetchHistorico(); // recarrega a tabela e os gráficos
-    } catch(err) {
-      console.error(err);
-      showToast('Erro', 'Não foi possível excluir o histórico.', 'error');
-    }
-  }
 
-  function toggleEditPeriodo() {
-    const view = document.getElementById('periodo-view');
-    const edit = document.getElementById('periodo-edit');
-    if (view.classList.contains('hidden')) {
-      view.classList.remove('hidden');
-      edit.classList.add('hidden');
-    } else {
-      view.classList.add('hidden');
-      edit.classList.remove('hidden');
-      document.getElementById('periodo-input').value = _currentPeriodo;
-    }
-  }
+      function toggleSelectAll() {
+        const selectAll = document.getElementById('selectAll');
+        const checkboxes = document.querySelectorAll('.history-checkbox');
+        checkboxes.forEach(cb => cb.checked = selectAll.checked);
+        updateBulkDeleteBtn();
+      }
 
-  async function salvarPeriodo() {
-    const input = document.getElementById('periodo-input');
-    const novoValor = input.value.trim();
-    if (!novoValor) return;
-    
-    if (!_currentId) {
-      showToast('Erro', 'Nenhuma conciliação ativa para editar.', 'error');
-      return;
-    }
+      function updateBulkDeleteBtn() {
+        const checkboxes = document.querySelectorAll('.history-checkbox:checked');
+        const btn = document.getElementById('bulk-delete-btn');
+        if (checkboxes.length > 0) {
+          btn.classList.remove('hidden');
+          btn.innerHTML = `<i class="ph ph-trash mr-1"></i> Excluir Selecionados (${checkboxes.length})`;
+        } else {
+          btn.classList.add('hidden');
+        }
+      }
 
-    try {
-      const resp = await fetch(API_BASE + '/api/historico/' + _currentId, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ periodo: novoValor })
-      });
-      if (!resp.ok) throw new Error('Falha ao atualizar período.');
-      
-      _currentPeriodo = novoValor;
-      document.getElementById('periodo-text').textContent = novoValor;
-      toggleEditPeriodo();
-      showToast('Sucesso', 'Período atualizado com sucesso.', 'success');
-    } catch(err) {
-      console.error(err);
-      showToast('Erro', 'Não foi possível atualizar o período.', 'error');
-    }
-  }
+      async function excluirSelecionados() {
+        const checkboxes = document.querySelectorAll('.history-checkbox:checked');
+        if (checkboxes.length === 0) return;
 
-  function visualizarHistorico(id, perfeitos, historico, desmembrados, saidas_estornos, divergencias, taxa_sucesso, periodo) {
-    _currentId = id;
-    _currentPeriodo = periodo || 'Desconhecido';
-    _resultados = {
-       perfeitos: perfeitos,
-       historico: historico,
-       desmembrados: desmembrados,
-       saidas_estornos: saidas_estornos,
-       divergencias: divergencias
-    };
-    _excelBlob = null; 
-    
-    document.getElementById('periodo-text').textContent = _currentPeriodo;
-    const totalCalc = perfeitos + historico + desmembrados + saidas_estornos + divergencias;
-    _preencherResultados(_resultados, taxa_sucesso, totalCalc);
-    
-    document.getElementById('tab-nova').className = 'border-b-2 border-[#038201] text-[#038201] py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none';
-    document.getElementById('tab-historico').className = 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none';
-    showView('results');
-  }
+        if (!confirm(`Tem certeza que deseja excluir ${checkboxes.length} conciliação(ões)?`)) return;
 
-  function toggleRowEdit(id, currentValue = '') {
-    const view = document.getElementById('td-periodo-view-' + id);
-    const edit = document.getElementById('td-periodo-edit-' + id);
-    if (view.classList.contains('hidden')) {
-      view.classList.remove('hidden');
-      edit.classList.add('hidden');
-    } else {
-      view.classList.add('hidden');
-      edit.classList.remove('hidden');
-      document.getElementById('td-periodo-input-' + id).value = currentValue;
-    }
-  }
+        const ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
 
-  async function salvarRowPeriodo(id) {
-    const input = document.getElementById('td-periodo-input-' + id);
-    const novoValor = input.value.trim();
-    if (!novoValor) return;
+        try {
+          const resp = await fetch(API_BASE + '/api/historico/bulk', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: ids })
+          });
+          if (!resp.ok) throw new Error('Falha ao excluir históricos.');
+          showToast('Sucesso', 'Históricos e arquivos excluídos com sucesso.', 'success');
+          document.getElementById('selectAll').checked = false;
+          updateBulkDeleteBtn();
+          fetchHistorico();
+        } catch (err) {
+          console.error(err);
+          showToast('Erro', 'Não foi possível excluir os históricos.', 'error');
+        }
+      }
 
-    try {
-      const resp = await fetch(API_BASE + '/api/historico/' + id, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ periodo: novoValor })
-      });
-      if (!resp.ok) throw new Error('Falha ao atualizar período na tabela.');
-      
-      showToast('Sucesso', 'Período atualizado na tabela.', 'success');
-      fetchHistorico();
-    } catch(err) {
-      console.error(err);
-      showToast('Erro', 'Não foi possível atualizar o período.', 'error');
-    }
-  }
+      async function excluirHistorico(id) {
 
-  // ==========================================
-  // LÓGICA DO MODAL DE ANOTAÇÕES
-  // ==========================================
-  let _currentAnotacaoId = null;
+        if (!confirm('Tem certeza que deseja excluir o histórico desta conciliação?')) return;
+        try {
+          const resp = await fetch(API_BASE + '/api/historico/' + id, { method: 'DELETE' });
+          if (!resp.ok) throw new Error('Falha ao excluir histórico.');
+          showToast('Sucesso', 'Histórico e arquivo excluídos com sucesso.', 'success');
+          fetchHistorico(); // recarrega a tabela e os gráficos
+        } catch (err) {
+          console.error(err);
+          showToast('Erro', 'Não foi possível excluir o histórico.', 'error');
+        }
+      }
 
-  function abrirModalAnotacao(id) {
-    const row = window.historicoData.find(r => r.id === id);
-    if (!row) return;
+      function toggleEditPeriodo() {
+        const view = document.getElementById('periodo-view');
+        const edit = document.getElementById('periodo-edit');
+        if (view.classList.contains('hidden')) {
+          view.classList.remove('hidden');
+          edit.classList.add('hidden');
+        } else {
+          view.classList.add('hidden');
+          edit.classList.remove('hidden');
+          document.getElementById('periodo-input').value = _currentPeriodo;
+        }
+      }
 
-    _currentAnotacaoId = id;
-    document.getElementById('modal-anotacao-periodo').textContent = 'Período: ' + (row.periodo || 'Desconhecido');
-    document.getElementById('editor-anotacao').innerHTML = row.anotacao || '';
-    
-    document.getElementById('modal-anotacao').classList.remove('hidden');
-    document.getElementById('editor-anotacao').focus();
-  }
+      async function salvarPeriodo() {
+        const input = document.getElementById('periodo-input');
+        const novoValor = input.value.trim();
+        if (!novoValor) return;
 
-  function fecharModalAnotacao() {
-    document.getElementById('modal-anotacao').classList.add('hidden');
-    _currentAnotacaoId = null;
-  }
+        if (!_currentId) {
+          showToast('Erro', 'Nenhuma conciliação ativa para editar.', 'error');
+          return;
+        }
 
-  function formatarAnotacao(comando, valor = null) {
-    document.execCommand(comando, false, valor);
-    document.getElementById('editor-anotacao').focus();
-  }
+        try {
+          const resp = await fetch(API_BASE + '/api/historico/' + _currentId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ periodo: novoValor })
+          });
+          if (!resp.ok) throw new Error('Falha ao atualizar período.');
 
-  async function salvarAnotacao() {
-    if (!_currentAnotacaoId) return;
-    const conteudo = document.getElementById('editor-anotacao').innerHTML;
-    
-    try {
-      const resp = await fetch(API_BASE + '/api/historico/' + _currentAnotacaoId + '/anotacao', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ anotacao: conteudo })
-      });
-      if (!resp.ok) throw new Error('Falha ao salvar anotação.');
-      
-      showToast('Sucesso', 'Anotação salva com sucesso.', 'success');
-      fecharModalAnotacao();
-      fetchHistorico();
-    } catch(err) {
-      console.error(err);
-      showToast('Erro', 'Não foi possível salvar a anotação.', 'error');
-    }
-  }
+          _currentPeriodo = novoValor;
+          document.getElementById('periodo-text').textContent = novoValor;
+          toggleEditPeriodo();
+          showToast('Sucesso', 'Período atualizado com sucesso.', 'success');
+        } catch (err) {
+          console.error(err);
+          showToast('Erro', 'Não foi possível atualizar o período.', 'error');
+        }
+      }
 
-  async function limparAnotacao() {
-    if (!_currentAnotacaoId) return;
-    if(!confirm("Deseja realmente apagar esta anotação?")) return;
-    
-    try {
-      const resp = await fetch(API_BASE + '/api/historico/' + _currentAnotacaoId + '/anotacao', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ anotacao: '' })
-      });
-      if (!resp.ok) throw new Error('Falha ao excluir anotação.');
-      
-      showToast('Sucesso', 'Anotação excluída.', 'success');
-      fecharModalAnotacao();
-      fetchHistorico();
-    } catch(err) {
-      console.error(err);
-      showToast('Erro', 'Não foi possível excluir a anotação.', 'error');
-    }
-  }
+      function visualizarHistorico(id, perfeitos, historico, desmembrados, saidas_estornos, divergencias, taxa_sucesso, periodo) {
+        _currentId = id;
+        _currentPeriodo = periodo || 'Desconhecido';
+        _resultados = {
+          perfeitos: perfeitos,
+          historico: historico,
+          desmembrados: desmembrados,
+          saidas_estornos: saidas_estornos,
+          divergencias: divergencias
+        };
+        _excelBlob = null;
 
-  // ==========================================
-  // SUPABASE AUTH LÓGICA
-  // ==========================================
-  const SUPABASE_URL = 'https://lhplusbyrbdaszsknkmo.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxocGx1c2J5cmJkYXN6c2tua21vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NDIyNDgsImV4cCI6MjEwMDMxODI0OH0.0sSNrN7ShD3XuzQgZTlSq9zsHGR7XVGyPVnBkOa-DqM';
-  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  window.supabaseSession = null;
-  let isChangingPassword = false;
+        document.getElementById('periodo-text').textContent = _currentPeriodo;
+        const totalCalc = perfeitos + historico + desmembrados + saidas_estornos + divergencias;
+        _preencherResultados(_resultados, taxa_sucesso, totalCalc);
 
-  // Interceptar Fetch para injetar Token JWT
-  const originalFetch = window.fetch;
-  window.fetch = async function() {
-    let [resource, config] = arguments;
-    if(config === undefined) { config = {}; }
-    if(config.headers === undefined) { config.headers = {}; }
-    
-    // Se FormData, fetch já decide o Content-Type sozinho se omitido, mas injetamos o token em Headers
-    if (config.headers instanceof Headers) {
-      if (window.supabaseSession) config.headers.append('Authorization', 'Bearer ' + window.supabaseSession.access_token);
-    } else {
-      if (window.supabaseSession) config.headers['Authorization'] = 'Bearer ' + window.supabaseSession.access_token;
-    }
-    
-    const response = await originalFetch(resource, config);
-    if (response.status === 401) {
-      // Token expirou ou é inválido
-      logout();
-    }
-    return response;
-  };
+        document.getElementById('tab-nova').className = 'border-b-2 border-[#038201] text-[#038201] py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none';
+        document.getElementById('tab-historico').className = 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none';
+        showView('results');
+      }
 
-  async function checkSession() {
-    const { data: { session }, error } = await supabaseClient.auth.getSession();
-    if (session) {
-      window.supabaseSession = session;
-      document.getElementById('view-login').classList.add('hidden');
-      document.getElementById('app-content').classList.remove('hidden');
-      document.getElementById('btn-logout').classList.remove('hidden');
-      document.getElementById('btn-logout').classList.add('flex');
-    } else {
+      function toggleRowEdit(id, currentValue = '') {
+        const view = document.getElementById('td-periodo-view-' + id);
+        const edit = document.getElementById('td-periodo-edit-' + id);
+        if (view.classList.contains('hidden')) {
+          view.classList.remove('hidden');
+          edit.classList.add('hidden');
+        } else {
+          view.classList.add('hidden');
+          edit.classList.remove('hidden');
+          document.getElementById('td-periodo-input-' + id).value = currentValue;
+        }
+      }
+
+      async function salvarRowPeriodo(id) {
+        const input = document.getElementById('td-periodo-input-' + id);
+        const novoValor = input.value.trim();
+        if (!novoValor) return;
+
+        try {
+          const resp = await fetch(API_BASE + '/api/historico/' + id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ periodo: novoValor })
+          });
+          if (!resp.ok) throw new Error('Falha ao atualizar período na tabela.');
+
+          showToast('Sucesso', 'Período atualizado na tabela.', 'success');
+          fetchHistorico();
+        } catch (err) {
+          console.error(err);
+          showToast('Erro', 'Não foi possível atualizar o período.', 'error');
+        }
+      }
+
+      // ==========================================
+      // LÓGICA DO MODAL DE ANOTAÇÕES
+      // ==========================================
+      let _currentAnotacaoId = null;
+
+      function abrirModalAnotacao(id) {
+        const row = window.historicoData.find(r => r.id === id);
+        if (!row) return;
+
+        _currentAnotacaoId = id;
+        document.getElementById('modal-anotacao-periodo').textContent = 'Período: ' + (row.periodo || 'Desconhecido');
+        document.getElementById('editor-anotacao').innerHTML = row.anotacao || '';
+
+        document.getElementById('modal-anotacao').classList.remove('hidden');
+        document.getElementById('editor-anotacao').focus();
+      }
+
+      function fecharModalAnotacao() {
+        document.getElementById('modal-anotacao').classList.add('hidden');
+        _currentAnotacaoId = null;
+      }
+
+      function formatarAnotacao(comando, valor = null) {
+        document.execCommand(comando, false, valor);
+        document.getElementById('editor-anotacao').focus();
+      }
+
+      async function salvarAnotacao() {
+        if (!_currentAnotacaoId) return;
+        const conteudo = document.getElementById('editor-anotacao').innerHTML;
+
+        try {
+          const resp = await fetch(API_BASE + '/api/historico/' + _currentAnotacaoId + '/anotacao', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ anotacao: conteudo })
+          });
+          if (!resp.ok) throw new Error('Falha ao salvar anotação.');
+
+          showToast('Sucesso', 'Anotação salva com sucesso.', 'success');
+          fecharModalAnotacao();
+          fetchHistorico();
+        } catch (err) {
+          console.error(err);
+          showToast('Erro', 'Não foi possível salvar a anotação.', 'error');
+        }
+      }
+
+      async function limparAnotacao() {
+        if (!_currentAnotacaoId) return;
+        if (!confirm("Deseja realmente apagar esta anotação?")) return;
+
+        try {
+          const resp = await fetch(API_BASE + '/api/historico/' + _currentAnotacaoId + '/anotacao', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ anotacao: '' })
+          });
+          if (!resp.ok) throw new Error('Falha ao excluir anotação.');
+
+          showToast('Sucesso', 'Anotação excluída.', 'success');
+          fecharModalAnotacao();
+          fetchHistorico();
+        } catch (err) {
+          console.error(err);
+          showToast('Erro', 'Não foi possível excluir a anotação.', 'error');
+        }
+      }
+
+      // ==========================================
+      // SUPABASE AUTH LÓGICA
+      // ==========================================
+      const SUPABASE_URL = 'https://lhplusbyrbdaszsknkmo.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxocGx1c2J5cmJkYXN6c2tua21vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NDIyNDgsImV4cCI6MjEwMDMxODI0OH0.0sSNrN7ShD3XuzQgZTlSq9zsHGR7XVGyPVnBkOa-DqM';
+      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       window.supabaseSession = null;
-      document.getElementById('app-content').classList.add('hidden');
-      document.getElementById('view-login').classList.remove('hidden');
-      document.getElementById('btn-logout').classList.add('hidden');
-      document.getElementById('btn-logout').classList.remove('flex');
-    }
-  }
+      let isChangingPassword = false;
 
-  function togglePasswordMode() {
-    isChangingPassword = !isChangingPassword;
-    const divNewPwd = document.getElementById('div-new-password');
-    const btnSubmit = document.getElementById('btn-login-submit');
-    const btnToggle = document.getElementById('btn-toggle-password');
-    const loginTitle = document.getElementById('login-title');
-    const loginDesc = document.getElementById('login-desc');
+      // Interceptar Fetch para injetar Token JWT
+      const originalFetch = window.fetch;
+      window.fetch = async function () {
+        let [resource, config] = arguments;
+        if (config === undefined) { config = {}; }
+        if (config.headers === undefined) { config.headers = {}; }
 
-    if (isChangingPassword) {
-      divNewPwd.classList.remove('hidden');
-      document.getElementById('login-new-password').required = true;
-      btnSubmit.innerHTML = '<span>Alterar Senha</span><i class="ph ph-check-circle text-lg"></i>';
-      btnToggle.textContent = 'Voltar para login normal';
-      loginTitle.textContent = 'Alterar Senha';
-      loginDesc.textContent = 'Insira sua senha atual e a nova senha desejada.';
-    } else {
-      divNewPwd.classList.add('hidden');
-      document.getElementById('login-new-password').required = false;
-      document.getElementById('login-new-password').value = '';
-      btnSubmit.innerHTML = '<span>Entrar</span><i class="ph ph-arrow-right text-lg"></i>';
-      btnToggle.textContent = 'Quero alterar minha senha';
-      loginTitle.textContent = 'Acesso Restrito';
-      loginDesc.textContent = 'Insira suas credenciais para acessar o sistema.';
-    }
-    document.getElementById('login-error').classList.add('hidden');
-    document.getElementById('login-success').classList.add('hidden');
-  }
+        // Se FormData, fetch já decide o Content-Type sozinho se omitido, mas injetamos o token em Headers
+        if (config.headers instanceof Headers) {
+          if (window.supabaseSession) config.headers.append('Authorization', 'Bearer ' + window.supabaseSession.access_token);
+        } else {
+          if (window.supabaseSession) config.headers['Authorization'] = 'Bearer ' + window.supabaseSession.access_token;
+        }
 
-  async function handleLogin(e) {
-    e.preventDefault();
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
-    const newPassword = document.getElementById('login-new-password').value;
-    
-    const errorDiv = document.getElementById('login-error');
-    const successDiv = document.getElementById('login-success');
-    errorDiv.classList.add('hidden');
-    successDiv.classList.add('hidden');
-    
-    const btn = document.getElementById('btn-login-submit');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i>';
-    btn.disabled = true;
+        const response = await originalFetch(resource, config);
+        if (response.status === 401) {
+          // Token expirou ou é inválido
+          logout();
+        }
+        return response;
+      };
 
-    try {
-      // 1. Fazer login normal para autenticar (necessário até para trocar a senha)
-      const { data, error } = await supabaseClient.auth.signInWithPassword({
-        email: email,
-        password: password
-      });
+      async function checkSession() {
+        const { data: { session }, error } = await supabaseClient.auth.getSession();
+        if (session) {
+          window.supabaseSession = session;
+          document.getElementById('view-login').classList.add('hidden');
+          document.getElementById('app-content').classList.remove('hidden');
+          document.getElementById('btn-logout').classList.remove('hidden');
+          document.getElementById('btn-logout').classList.add('flex');
+        } else {
+          window.supabaseSession = null;
+          document.getElementById('app-content').classList.add('hidden');
+          document.getElementById('view-login').classList.remove('hidden');
+          document.getElementById('btn-logout').classList.add('hidden');
+          document.getElementById('btn-logout').classList.remove('flex');
+        }
+      }
 
-      if (error) throw error;
+      function togglePasswordMode() {
+        isChangingPassword = !isChangingPassword;
+        const divNewPwd = document.getElementById('div-new-password');
+        const btnSubmit = document.getElementById('btn-login-submit');
+        const btnToggle = document.getElementById('btn-toggle-password');
+        const loginTitle = document.getElementById('login-title');
+        const loginDesc = document.getElementById('login-desc');
 
-      if (isChangingPassword) {
-        // Atualizar senha
-        const { error: updateError } = await supabaseClient.auth.updateUser({ password: newPassword });
-        if (updateError) throw updateError;
-        
-        successDiv.textContent = 'Senha atualizada com sucesso! Você já pode entrar.';
-        successDiv.classList.remove('hidden');
-        
-        // Fazer logout para obrigar entrar com a senha nova, ou apenas manter logado.
-        // Optamos por fazer logout para forçar login normal com senha nova:
+        if (isChangingPassword) {
+          divNewPwd.classList.remove('hidden');
+          document.getElementById('login-new-password').required = true;
+          btnSubmit.innerHTML = '<span>Alterar Senha</span><i class="ph ph-check-circle text-lg"></i>';
+          btnToggle.textContent = 'Voltar para login normal';
+          loginTitle.textContent = 'Alterar Senha';
+          loginDesc.textContent = 'Insira sua senha atual e a nova senha desejada.';
+        } else {
+          divNewPwd.classList.add('hidden');
+          document.getElementById('login-new-password').required = false;
+          document.getElementById('login-new-password').value = '';
+          btnSubmit.innerHTML = '<span>Entrar</span><i class="ph ph-arrow-right text-lg"></i>';
+          btnToggle.textContent = 'Quero alterar minha senha';
+          loginTitle.textContent = 'Acesso Restrito';
+          loginDesc.textContent = 'Insira suas credenciais para acessar o sistema.';
+        }
+        document.getElementById('login-error').classList.add('hidden');
+        document.getElementById('login-success').classList.add('hidden');
+      }
+
+      async function handleLogin(e) {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        const newPassword = document.getElementById('login-new-password').value;
+
+        const errorDiv = document.getElementById('login-error');
+        const successDiv = document.getElementById('login-success');
+        errorDiv.classList.add('hidden');
+        successDiv.classList.add('hidden');
+
+        const btn = document.getElementById('btn-login-submit');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i>';
+        btn.disabled = true;
+
+        try {
+          // 1. Fazer login normal para autenticar (necessário até para trocar a senha)
+          const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: password
+          });
+
+          if (error) throw error;
+
+          if (isChangingPassword) {
+            // Atualizar senha
+            const { error: updateError } = await supabaseClient.auth.updateUser({ password: newPassword });
+            if (updateError) throw updateError;
+
+            successDiv.textContent = 'Senha atualizada com sucesso! Você já pode entrar.';
+            successDiv.classList.remove('hidden');
+
+            // Fazer logout para obrigar entrar com a senha nova, ou apenas manter logado.
+            // Optamos por fazer logout para forçar login normal com senha nova:
+            await supabaseClient.auth.signOut();
+            togglePasswordMode(); // Volta pra tela de login
+            document.getElementById('login-password').value = '';
+          } else {
+            // Fluxo de login normal
+            await checkSession();
+          }
+        } catch (err) {
+          console.error(err);
+          errorDiv.textContent = err.message === 'Invalid login credentials' ? 'Usuário ou senha incorretos.' : err.message;
+          errorDiv.classList.remove('hidden');
+        } finally {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
+      }
+
+      async function logout() {
         await supabaseClient.auth.signOut();
-        togglePasswordMode(); // Volta pra tela de login
-        document.getElementById('login-password').value = '';
-      } else {
-        // Fluxo de login normal
         await checkSession();
       }
-    } catch (err) {
-      console.error(err);
-      errorDiv.textContent = err.message === 'Invalid login credentials' ? 'Usuário ou senha incorretos.' : err.message;
-      errorDiv.classList.remove('hidden');
-    } finally {
-      btn.innerHTML = originalText;
-      btn.disabled = false;
-    }
-  }
 
-  async function logout() {
-    await supabaseClient.auth.signOut();
-    await checkSession();
-  }
+      // Verifica a sessão ao carregar a página
+      window.addEventListener('DOMContentLoaded', checkSession);
 
-  // Verifica a sessão ao carregar a página
-  window.addEventListener('DOMContentLoaded', checkSession);
-
-</script>
-</div>
+    </script>
+  </div>
 </body>
+
 </html>
