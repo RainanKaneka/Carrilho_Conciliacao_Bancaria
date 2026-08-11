@@ -646,9 +646,21 @@ class ReconciliationEngine:
         # REGRA 1: CONCILIADO PERFEITO (Valores Exatos com concorrência)
         # ==========================================
         m_a, m_b = [], []
+        col_cliente = 'CLIENTE' if 'CLIENTE' in argos_pendentes.columns else 'Cliente'
+        
         for i, row_a in argos_pendentes.iterrows():
             candidatos = bank_pendentes[(bank_pendentes['Valor'] == row_a['Valor']) & (~bank_pendentes['ID_Bank'].isin(m_b))].copy()
             if not candidatos.empty:
+                # Calcular name_score
+                cliente_str = str(row_a.get(col_cliente, '')).strip().upper()
+                palavras_nome = [p for p in cliente_str.split() if len(p) > 2]
+                
+                def calc_name_score(hist):
+                    hist = str(hist).upper()
+                    return sum(1 for p in palavras_nome if p in hist)
+                
+                candidatos['name_score'] = candidatos['Histórico'].apply(calc_name_score)
+                
                 # Tenta extrair data do histórico para ajudar na Regra 1
                 texto_hist = str(row_a.get('Histórico', '') if 'Histórico' in row_a else row_a.get('OBS', ''))
                 data_referencia_hist = None
@@ -670,9 +682,17 @@ class ReconciliationEngine:
                 else:
                     candidatos['diff_dias'] = diff_dias
                     
-                candidatos = candidatos.sort_values(by='diff_dias')
+                # Ordena priorizando quem tem match no nome, e depois a data mais próxima
+                candidatos = candidatos.sort_values(by=['name_score', 'diff_dias'], ascending=[False, True])
                 
                 for j, row_b in candidatos.iterrows():
+                    # Se o name_score for 0 e houver mais de um candidato possível com esse valor na base do banco (competição real sem pistas)
+                    # Não vamos chutar cegamente para não dar baixa na pessoa errada.
+                    # Mas se só sobrou 1 candidato, a gente pode dar match (pois é o único restante com esse valor).
+                    if row_b['name_score'] == 0 and len(candidatos) > 1:
+                        # Pula, pois é um chute perigoso (Ex: 2 Chrystians no banco e 1 Emporio no sistema)
+                        continue
+                        
                     if pd.notna(row_b['diff_dias']) and row_b['diff_dias'] <= 31:
                         nota = row_a.to_dict().copy()
                         nota['Baixas'] = row_b['Banco']
