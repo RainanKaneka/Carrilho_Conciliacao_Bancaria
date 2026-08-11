@@ -129,7 +129,10 @@ app.add_middleware(
 )
 
 # Avisa o FastAPI para liberar o acesso público a tudo que estiver na pasta 'img'
-app.mount("/img", StaticFiles(directory="img"), name="img")
+import os
+from pathlib import Path
+_IMG_DIR = Path(__file__).parent / "img"
+app.mount("/img", StaticFiles(directory=str(_IMG_DIR)), name="img")
 
 # ---------------------------------------------------------------------------
 # Servir o Front-end (index.html) como raiz do servidor
