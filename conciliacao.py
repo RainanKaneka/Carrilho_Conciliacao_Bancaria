@@ -2,6 +2,7 @@ import argparse
 import warnings
 import pandas as pd
 import re
+import pdfplumber
 import itertools
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -115,9 +116,162 @@ class DataCleaner:
             return pd.DataFrame()
 
     @staticmethod
+    def _read_nature_pdf(file_path: str) -> pd.DataFrame:
+        data = []
+        current_date = None
+        
+        with pdfplumber.open(file_path) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if not text:
+                    continue
+                
+                lines = text.split('\n')
+                for i, line in enumerate(lines):
+                    date_match = re.search(r'^(\d{2} [A-Z]{3} \d{4})', line)
+                    if date_match:
+                        current_date = date_match.group(1)
+                    
+                    if "Transferência recebida pelo Pix" in line or "Transferência Recebida" in line:
+                        val_match = re.search(r'([\d\.]+,\d{2})$', line)
+                        
+                        if val_match:
+                            val_str = val_match.group(1)
+                            name_match = re.search(r'Pix\s+([A-Z\s]+)\s+-', line, re.IGNORECASE)
+                            if not name_match:
+                                name_match = re.search(r'Recebida\s+([A-Za-z\s]+)\s+-', line, re.IGNORECASE)
+                                
+                            if name_match:
+                                name = name_match.group(1).strip()
+                            else:
+                                clean_name = re.sub(r'Transferência recebida pelo Pix|Transferência Recebida', '', line, flags=re.IGNORECASE).strip()
+                                clean_name = clean_name.replace(val_str, '').strip()
+                                clean_name = clean_name.split('-')[0].strip()
+                                name = clean_name
+                                
+                            date_str = ""
+                            if current_date:
+                                try:
+                                    dt = pd.to_datetime(current_date, format="%d %b %Y")
+                                    date_str = dt.strftime("%d/%m/%Y")
+                                except:
+                                    pass
+                                    
+                            data.append({
+                                'Data': date_str,
+                                'Histórico': name,
+                                'Valor': val_str,
+                                'Tipo': 'C'
+                            })
+                        else:
+                            if i + 1 < len(lines):
+                                next_line = lines[i+1].strip()
+                                val_match_next = re.search(r'^([\d\.]+,\d{2})$', next_line)
+                                if val_match_next:
+                                    val_str = val_match_next.group(1)
+                                    clean_name = re.sub(r'Transferência recebida pelo Pix|Transferência Recebida', '', line, flags=re.IGNORECASE).strip()
+                                    clean_name = clean_name.split('-')[0].strip()
+                                    name = clean_name
+                                    
+                                    date_str = ""
+                                    if current_date:
+                                        try:
+                                            dt = pd.to_datetime(current_date, format="%d %b %Y")
+                                            date_str = dt.strftime("%d/%m/%Y")
+                                        except:
+                                            pass
+                                    
+                                    data.append({
+                                        'Data': date_str,
+                                        'Histórico': name,
+                                        'Valor': val_str,
+                                        'Tipo': 'C'
+                                    })
+        
+        df = pd.DataFrame(data)
+        def safe_float(val):
+            if pd.isna(val): return 0.0
+            val = str(val).upper().replace('R$', '').strip()
+            if '.' in val and ',' in val:
+                val = val.replace('.', '').replace(',', '.')
+            elif ',' in val:
+                val = val.replace(',', '.')
+            try:
+                return float(val)
+            except:
+                return 0.0
+                
+        if not df.empty:
+            df['Valor'] = df['Valor'].apply(safe_float)
+            df['Banco'] = 'NATURE'
+            
+        return df
+
+    @staticmethod
+    def _read_bnb_pdf(file_path: str) -> pd.DataFrame:
+        data = []
+        with pdfplumber.open(file_path) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if not text:
+                    continue
+                
+                lines = text.split('\n')
+                for line in lines:
+                    line = line.strip()
+                    match = re.search(r'^(\d{2}/\d{2}/\d{4})\s+(.*?)\s+(\d+)\s+(-?\s*[\d\.]+,\d{2})\s+([\d\.]+,\d{2})$', line)
+                    if match:
+                        date_str = match.group(1)
+                        historico = match.group(2).strip()
+                        valor_str = match.group(4).replace(' ', '')
+                        
+                        if '-' in valor_str:
+                            tipo = 'D'
+                            valor_str = valor_str.replace('-', '')
+                        else:
+                            tipo = 'C'
+                        
+                        data.append({
+                            'Data': date_str,
+                            'Histórico': historico,
+                            'Valor': valor_str,
+                            'Tipo': tipo
+                        })
+        df = pd.DataFrame(data)
+        def safe_float(val):
+            if pd.isna(val): return 0.0
+            val = str(val).upper().replace('R$', '').strip()
+            if '.' in val and ',' in val:
+                val = val.replace('.', '').replace(',', '.')
+            elif ',' in val:
+                val = val.replace(',', '.')
+            try:
+                return float(val)
+            except:
+                return 0.0
+                
+        if not df.empty:
+            df['Valor'] = df['Valor'].apply(safe_float)
+            df['Banco'] = 'BNB'
+            
+        return df
+
+    @staticmethod
     def clean_bank(file_path: str) -> pd.DataFrame:
         try:
             import pandas as pd
+            
+            if str(file_path).lower().endswith('.pdf'):
+                text = ""
+                with pdfplumber.open(file_path) as pdf:
+                    if pdf.pages:
+                        text = pdf.pages[0].extract_text() or ""
+                text_lower = text.lower()
+                if "banco do nordeste" in text_lower or "bnb" in text_lower:
+                    return DataCleaner._read_bnb_pdf(file_path)
+                else:
+                    return DataCleaner._read_nature_pdf(file_path)
+                
             df = pd.read_excel(file_path, engine='openpyxl')
             
             header_idx = None

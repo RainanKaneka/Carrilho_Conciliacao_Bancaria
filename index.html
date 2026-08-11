@@ -324,17 +324,17 @@
                   <i class="ph ph-currency-circle-dollar text-[#038201] text-3xl"></i>
                 </div>
                 <div>
-                  <p class="text-gray-600 font-medium text-sm">Arraste os extratos do Banco (.xlsx)</p>
+                  <p class="text-gray-600 font-medium text-sm">Arraste os extratos do Banco (.xlsx, .pdf)</p>
                   <p class="text-gray-400 text-xs mt-0.5">ou <span
                       class="text-[#038201] font-semibold underline underline-offset-2">clique para procurar</span></p>
                 </div>
                 <span
                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">
-                  <i class="ph ph-file-text text-xs"></i> .xlsx · múltiplos arquivos
+                  <i class="ph ph-file-text text-xs"></i> .xlsx, .pdf · múltiplos arquivos
                 </span>
               </div>
             </div>
-            <input id="input-bank" type="file" accept=".xlsx,.xls,.csv" multiple class="hidden"
+            <input id="input-bank" type="file" accept=".xlsx,.xls,.csv,.pdf" multiple class="hidden"
               onchange="handleFileInput(event,'bank')" />
             <div id="list-bank" class="mt-4 space-y-2 hidden"></div>
           </div>
@@ -349,6 +349,8 @@
             <option value="generico">Genérico (auto-detect)</option>
             <option value="banese">Banese</option>
             <option value="caixa">Caixa Econômica</option>
+            <option value="nature">Nature</option>
+            <option value="bnb">Banco do Nordeste</option>
           </select>
         </div>
 
@@ -773,15 +775,30 @@
         e.preventDefault(); e.stopPropagation();
         const id = type === 'argos' ? 'drop-argos' : 'drop-bank';
         document.getElementById(id).classList.remove('drag-over');
-        const files = Array.from(e.dataTransfer.files).filter(isValidFile);
-        if (!files.length) { showToast('Formato inválido', 'Use arquivos .xlsx, .xls ou .csv', 'warning'); return; }
+        const files = Array.from(e.dataTransfer.files).filter(f => isValidFile(f, type));
+        if (!files.length) { 
+            const msg = type === 'argos' ? 'Use arquivos .xlsx, .xls ou .csv' : 'Use arquivos .xlsx, .xls, .csv ou .pdf';
+            showToast('Formato inválido', msg, 'warning'); 
+            return; 
+        }
         addFiles(type, files);
       }
       function handleFileInput(e, type) {
-        addFiles(type, Array.from(e.target.files).filter(isValidFile));
+        const files = Array.from(e.target.files).filter(f => isValidFile(f, type));
+        if (!files.length) {
+            const msg = type === 'argos' ? 'Use arquivos .xlsx, .xls ou .csv' : 'Use arquivos .xlsx, .xls, .csv ou .pdf';
+            showToast('Formato inválido', msg, 'warning');
+            e.target.value = '';
+            return;
+        }
+        addFiles(type, files);
         e.target.value = '';
       }
-      function isValidFile(f) { return ['xlsx', 'xls', 'csv'].includes(f.name.split('.').pop().toLowerCase()); }
+      function isValidFile(f, type) { 
+        const ext = f.name.split('.').pop().toLowerCase();
+        if (type === 'argos') return ['xlsx', 'xls', 'csv'].includes(ext);
+        return ['xlsx', 'xls', 'csv', 'pdf'].includes(ext);
+      }
 
       function addFiles(type, files) {
         const existing = new Set(state[type].map(f => f.name));

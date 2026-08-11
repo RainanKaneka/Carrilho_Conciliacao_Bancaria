@@ -234,15 +234,15 @@ def _validar_extensao(filename: str) -> None:
         filename: Nome do arquivo a validar.
 
     Raises:
-        HTTPException 400: Se a extensão não for .xlsx, .xls ou .csv.
+        HTTPException 400: Se a extensão não for .xlsx, .xls, .csv ou .pdf.
     """
     ext = Path(filename).suffix.lower()
-    if ext not in {".xlsx", ".xls", ".csv"}:
+    if ext not in {".xlsx", ".xls", ".csv", ".pdf"}:
         raise HTTPException(
             status_code=400,
             detail=(
                 f"Arquivo '{filename}' com formato '{ext}' não é suportado. "
-                f"Use arquivos .xlsx, .xls ou .csv."
+                f"Use arquivos .xlsx, .xls, .csv ou .pdf."
             ),
         )
 
