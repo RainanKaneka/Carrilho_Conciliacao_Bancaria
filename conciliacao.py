@@ -690,8 +690,14 @@ class ReconciliationEngine:
                     # Não vamos chutar cegamente para não dar baixa na pessoa errada.
                     # Mas se só sobrou 1 candidato, a gente pode dar match (pois é o único restante com esse valor).
                     if row_b['name_score'] == 0 and len(candidatos) > 1:
-                        # Pula, pois é um chute perigoso (Ex: 2 Chrystians no banco e 1 Emporio no sistema)
-                        continue
+                        hist_b = str(row_b.get('Histórico', '')).strip().upper()
+                        genericos = [
+                            'PIX RECEBIDO', 'CRED PIX CHAVE', 'PIX RECEBIDO DADOS CONTA', 
+                            'DEPOSITO DINH LOTERICO', 'DEPOSITO DINHEIRO ATM'
+                        ]
+                        if hist_b not in genericos:
+                            # Pula, pois é um chute perigoso (Ex: 2 Chrystians no banco e 1 Emporio no sistema)
+                            continue
                         
                     if pd.notna(row_b['diff_dias']) and row_b['diff_dias'] <= 31:
                         nota = row_a.to_dict().copy()
