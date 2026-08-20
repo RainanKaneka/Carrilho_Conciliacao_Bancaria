@@ -397,8 +397,15 @@ async def conciliar(
         total = sucesso + qtd_divergencias
         taxa_sucesso = (sucesso / total * 100) if total > 0 else 0.0
 
+        # Extrair bancos processados
+        bancos_list = []
+        if not df_banco_full.empty and 'Banco' in df_banco_full.columns:
+            bancos_list = df_banco_full['Banco'].dropna().unique().tolist()
+        
+        bancos_str = ", ".join(sorted(bancos_list)) if bancos_list else "Desconhecido"
+
         # Lógica blindada para extração do Período
-        periodo_str = "Desconhecido"
+        periodo_str = f"Desconhecido | Bancos: {bancos_str}"
         try:
             datas_todas = []
             if not df_argos_full.empty and 'Data' in df_argos_full.columns:
@@ -413,7 +420,7 @@ async def conciliar(
                 if not datas_dt.empty:
                     data_min = datas_dt.min().strftime('%d/%m') # Ex: 16/06
                     data_max = datas_dt.max().strftime('%d/%m') # Ex: 30/06
-                    periodo_str = f"{data_min} a {data_max}"
+                    periodo_str = f"{data_min} a {data_max} | Bancos: {bancos_str}"
         except Exception as e:
             print(f"Aviso: Erro ao extrair período: {e}")
 

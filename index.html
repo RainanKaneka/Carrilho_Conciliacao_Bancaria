@@ -1288,7 +1288,7 @@
 
         // Prepara dados para os gráficos (últimos 10 registros cronológicos)
         const ultimos = data.slice(0, 10).reverse();
-        const labels = ultimos.map(r => r.periodo || 'Desconhecido');
+        const labels = ultimos.map(r => (r.periodo || 'Desconhecido').split(' | ')[0]);
         const taxas = ultimos.map(r => r.taxa_sucesso || 0);
         const conciliaArr = ultimos.map(r => r.perfeitos + r.historico + r.desmembrados + (r.saidas_estornos || 0));
         const divArr = ultimos.map(r => r.divergencias);
