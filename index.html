@@ -761,6 +761,35 @@
     </div>
 
     <script>
+      function formatPeriodoBancos(periodoRaw) {
+        if (!periodoRaw) return 'Desconhecido';
+        
+        if (!periodoRaw.includes('| Bancos:')) {
+            return periodoRaw;
+        }
+        
+        const parts = periodoRaw.split('| Bancos:');
+        const per = parts[0].trim();
+        const bancosStr = parts[1].trim();
+        
+        const colors = {
+            'BANESE COMER BEM': 'text-green-600',
+            'BANESE DPN': 'text-red-600',
+            'BANESE': 'text-green-600',
+            'CAIXA ECONOMICA': 'text-blue-600',
+            'NATURE': 'text-purple-600',
+            'BNB': 'text-rose-800',
+            'BANCO DO NORDESTE': 'text-rose-800'
+        };
+        
+        const formattedBancos = bancosStr.split(', ').map(b => {
+            const bUpper = b.toUpperCase();
+            const colorClass = colors[bUpper] || 'text-gray-600';
+            return `<span class="font-bold ${colorClass}">${b}</span>`;
+        }).join(', ');
+        
+        return `${per} <span class="text-gray-400">| Bancos:</span> ${formattedBancos}`;
+      }
       const state = { argos: [], bank: [] };
 
       function handleDragOver(e, id) {
@@ -977,7 +1006,7 @@
 
           setTimeout(() => {
             _preencherResultados(_resultados, percentagem, totalCalcFetch);
-            document.getElementById('periodo-text').textContent = _currentPeriodo || 'Desconhecido';
+            document.getElementById('periodo-text').innerHTML = formatPeriodoBancos(_currentPeriodo || 'Desconhecido');
             showView('results');
           }, 600);
 
@@ -1244,7 +1273,7 @@
           <td class="py-4 px-6 text-gray-800 font-medium whitespace-nowrap">${dataFormatada}</td>
           <td class="py-4 px-6 text-gray-500 text-xs font-medium whitespace-nowrap">
             <div id="td-periodo-view-${row.id}" class="flex items-center gap-2">
-              <span id="td-periodo-text-${row.id}">${row.periodo || 'Desconhecido'}</span>
+              <span id="td-periodo-text-${row.id}">${formatPeriodoBancos(row.periodo)}</span>
               <button onclick="toggleRowEdit(${row.id}, '${esc(row.periodo || '')}')" class="text-gray-400 hover:text-[#038201] transition-colors" title="Editar Período">
                 <i class="ph ph-pencil-simple text-sm"></i>
               </button>
@@ -1420,7 +1449,7 @@
           if (!resp.ok) throw new Error('Falha ao atualizar período.');
 
           _currentPeriodo = novoValor;
-          document.getElementById('periodo-text').textContent = novoValor;
+          document.getElementById('periodo-text').innerHTML = formatPeriodoBancos(novoValor);
           toggleEditPeriodo();
           showToast('Sucesso', 'Período atualizado com sucesso.', 'success');
         } catch (err) {
@@ -1441,7 +1470,7 @@
         };
         _excelBlob = null;
 
-        document.getElementById('periodo-text').textContent = _currentPeriodo;
+        document.getElementById('periodo-text').innerHTML = formatPeriodoBancos(_currentPeriodo);
         const totalCalc = perfeitos + historico + desmembrados + saidas_estornos + divergencias;
         _preencherResultados(_resultados, taxa_sucesso, totalCalc);
 
@@ -1494,7 +1523,7 @@
         if (!row) return;
 
         _currentAnotacaoId = id;
-        document.getElementById('modal-anotacao-periodo').textContent = 'Período: ' + (row.periodo || 'Desconhecido');
+        document.getElementById('modal-anotacao-periodo').innerHTML = 'Período: ' + formatPeriodoBancos(row.periodo || 'Desconhecido');
         document.getElementById('editor-anotacao').innerHTML = row.anotacao || '';
 
         document.getElementById('modal-anotacao').classList.remove('hidden');
