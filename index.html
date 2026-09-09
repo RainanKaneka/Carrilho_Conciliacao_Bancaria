@@ -156,7 +156,7 @@
 
   <!-- HEADER -->
   <header class="sticky top-0 z-50 bg-[white] shadow-md">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center relative">
       <!-- Logomarca (Esquerda) -->
       <a href="/"><img src="./img/carrilho.png" alt="Logo Carrilho" class="h-12 w-auto object-contain" /></a>
 
@@ -244,7 +244,7 @@
   <div id="app-content" class="hidden">
     <!-- NAV TABS -->
     <nav class="bg-white border-b border-gray-200">
-      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex space-x-8 justify-center">
           <button onclick="switchTab('nova')" id="tab-nova"
             class="border-b-2 border-[#038201] text-[#038201] py-4 px-1 text-sm font-semibold tracking-wide transition-colors outline-none focus:outline-none">Nova
@@ -257,7 +257,7 @@
     </nav>
 
     <!-- MAIN -->
-    <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
       <!-- VIEW: UPLOAD -->
       <div id="view-upload" class="animate-[fadeIn_0.4s_ease-out_both]">
@@ -623,25 +623,26 @@
             <table class="w-full text-left border-collapse">
               <thead>
                 <tr class="bg-gray-50 border-b border-gray-100">
-                  <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider w-12 text-center">
+                  <th class="py-3.5 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-10 text-center">
                     <input type="checkbox" id="selectAll" onclick="toggleSelectAll()">
                   </th>
-                  <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Data de
+                  <th class="py-3.5 px-3 sm:px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Data de
                     Processamento</th>
-                  <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider">Período</th>
-                  <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+                  <th class="py-3.5 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Período</th>
+                  <th class="py-3.5 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Bancos</th>
+                  <th class="py-3.5 px-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center whitespace-nowrap">
                     Conciliados</th>
-                  <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+                  <th class="py-3.5 px-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center whitespace-nowrap">
                     Divergências</th>
-                  <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Taxa de
+                  <th class="py-3.5 px-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center whitespace-nowrap">Taxa de
                     Sucesso</th>
-                  <th class="py-4 px-6 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Ação
+                  <th class="py-3.5 px-3 sm:px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right whitespace-nowrap">Ações
                   </th>
                 </tr>
               </thead>
               <tbody id="tabela-historico" class="divide-y divide-gray-100 text-sm">
                 <tr>
-                  <td colspan="6" class="py-8 text-center text-gray-400">Carregando histórico...</td>
+                  <td colspan="8" class="py-8 text-center text-gray-400">Carregando histórico...</td>
                 </tr>
               </tbody>
             </table>
@@ -653,7 +654,7 @@
 
     <!-- FOOTER -->
     <footer class="mt-16 border-t border-gray-100 bg-white w-full">
-      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-center">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-center">
         <p class="text-xs text-gray-400">© 2026 <span class="font-semibold text-gray-500">Carrilho Distribuidora</span>
           · Sistema de Conciliação Bancária · Desenvolvido por Rainan de Oliveira Reis</p>
         <!-- <div class="flex items-center gap-2 text-xs text-gray-400">
@@ -761,34 +762,60 @@
     </div>
 
     <script>
+      function extractPeriodoAndBancos(periodoRaw) {
+        if (!periodoRaw) return { periodo: 'Desconhecido', bancosList: [], rawBancos: '' };
+        if (!periodoRaw.includes('| Bancos:')) {
+          return { periodo: periodoRaw.trim() || 'Desconhecido', bancosList: [], rawBancos: '' };
+        }
+        const parts = periodoRaw.split('| Bancos:');
+        const periodo = parts[0].trim() || 'Desconhecido';
+        const rawBancos = parts[1].trim();
+        const bancosList = rawBancos ? rawBancos.split(',').map(b => b.trim()).filter(Boolean) : [];
+        return { periodo, bancosList, rawBancos };
+      }
+
+      function getBankBadgeStyle(banco) {
+        const b = (banco || '').trim();
+        const bUpper = b.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+        if (bUpper.includes('COMER BEM')) {
+          return { text: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', label: b }; // Verde
+        }
+        if (bUpper.includes('DPN')) {
+          return { text: '#b91c1c', bg: '#fef2f2', border: '#fecaca', label: b }; // Vermelho
+        }
+        if (bUpper.includes('BANESE')) {
+          return { text: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', label: b }; // Verde
+        }
+        if (bUpper.includes('CAIXA')) {
+          return { text: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe', label: b }; // Azul
+        }
+        if (bUpper.includes('NATURE')) {
+          return { text: '#7e22ce', bg: '#faf5ff', border: '#e9d5ff', label: b }; // Roxo
+        }
+        if (bUpper.includes('BNB') || bUpper.includes('NORDESTE')) {
+          return { text: '#701a31', bg: '#fdf2f4', border: '#fbcfe8', label: b }; // Vinho
+        }
+        return { text: '#4b5563', bg: '#f3f4f6', border: '#e5e7eb', label: b }; // Padrão
+      }
+
+      function renderBancosBadges(bancosList) {
+        if (!bancosList || bancosList.length === 0) {
+          return '<span class="text-gray-400 text-xs">—</span>';
+        }
+        return `<div class="flex flex-wrap items-center gap-1.5">` + bancosList.map(b => {
+          const s = getBankBadgeStyle(b);
+          return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold tracking-wide shadow-2xs whitespace-nowrap" style="color: ${s.text}; background-color: ${s.bg}; border: 1px solid ${s.border};">${s.label}</span>`;
+        }).join('') + `</div>`;
+      }
+
       function formatPeriodoBancos(periodoRaw) {
         if (!periodoRaw) return 'Desconhecido';
-        
-        if (!periodoRaw.includes('| Bancos:')) {
-            return periodoRaw;
+        const info = extractPeriodoAndBancos(periodoRaw);
+        if (!info.bancosList || info.bancosList.length === 0) {
+          return info.periodo;
         }
-        
-        const parts = periodoRaw.split('| Bancos:');
-        const per = parts[0].trim();
-        const bancosStr = parts[1].trim();
-        
-        const colors = {
-            'BANESE COMER BEM': 'text-green-600',
-            'BANESE DPN': 'text-red-600',
-            'BANESE': 'text-green-600',
-            'CAIXA ECONOMICA': 'text-blue-600',
-            'NATURE': 'text-purple-600',
-            'BNB': 'text-rose-800',
-            'BANCO DO NORDESTE': 'text-rose-800'
-        };
-        
-        const formattedBancos = bancosStr.split(', ').map(b => {
-            const bUpper = b.toUpperCase();
-            const colorClass = colors[bUpper] || 'text-gray-600';
-            return `<span class="font-bold ${colorClass}">${b}</span>`;
-        }).join(', ');
-        
-        return `${per} <span class="text-gray-400">| Bancos:</span> ${formattedBancos}`;
+        return `${info.periodo} <span class="text-gray-400 font-normal mx-1">| Bancos:</span> ${renderBancosBadges(info.bancosList)}`;
       }
       const state = { argos: [], bank: [] };
 
@@ -1249,7 +1276,7 @@
         const emptyState = document.getElementById('historico-empty');
 
         if (!data || data.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-gray-400">Nenhum histórico encontrado.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-gray-400">Nenhum histórico encontrado.</td></tr>';
           if (chartsContainer) chartsContainer.classList.add('hidden');
           if (emptyState) emptyState.classList.remove('hidden');
           return;
@@ -1267,47 +1294,60 @@
           const saidas = row.saidas_estornos || 0;
           const conciliados = row.perfeitos + row.historico + row.desmembrados + saidas;
           const sucesso = (row.taxa_sucesso || 0).toFixed(1);
+          const info = extractPeriodoAndBancos(row.periodo);
+
           return `
-        <tr class="hover:bg-gray-50 transition-colors">
-          <td class="py-4 px-6 text-center"><input type="checkbox" class="history-checkbox" value="${row.id}" onchange="updateBulkDeleteBtn()"></td>
-          <td class="py-4 px-6 text-gray-800 font-medium whitespace-nowrap">${dataFormatada}</td>
-          <td class="py-4 px-6 text-gray-500 text-xs font-medium whitespace-nowrap">
-            <div id="td-periodo-view-${row.id}" class="flex items-center gap-2">
-              <span id="td-periodo-text-${row.id}">${formatPeriodoBancos(row.periodo)}</span>
-              <button onclick="toggleRowEdit(${row.id}, '${esc(row.periodo || '')}')" class="text-gray-400 hover:text-[#038201] transition-colors" title="Editar Período">
+        <tr class="hover:bg-gray-50/80 transition-colors">
+          <td class="py-3.5 px-3 text-center">
+            <input type="checkbox" class="history-checkbox" value="${row.id}" onchange="updateBulkDeleteBtn()">
+          </td>
+          <td class="py-3.5 px-3 sm:px-4 text-gray-800 font-medium text-xs sm:text-sm whitespace-nowrap">
+            ${dataFormatada}
+          </td>
+          <td class="py-3.5 px-3 text-gray-600 text-xs font-medium whitespace-nowrap">
+            <div id="td-periodo-view-${row.id}" class="flex items-center gap-1.5">
+              <span id="td-periodo-text-${row.id}" class="font-semibold text-gray-700">${info.periodo}</span>
+              <button onclick="toggleRowEdit(${row.id}, '${esc(row.periodo || '')}')" class="text-gray-400 hover:text-[#038201] transition-colors p-0.5 rounded" title="Editar Período">
                 <i class="ph ph-pencil-simple text-sm"></i>
               </button>
             </div>
-            <div id="td-periodo-edit-${row.id}" class="hidden flex items-center gap-2">
-              <input type="text" id="td-periodo-input-${row.id}" class="text-xs font-bold text-gray-800 border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#038201] w-24 text-center" />
+            <div id="td-periodo-edit-${row.id}" class="hidden flex items-center gap-1.5">
+              <input type="text" id="td-periodo-input-${row.id}" class="text-xs font-bold text-gray-800 border border-gray-200 rounded px-1.5 py-0.5 outline-none focus:border-[#038201] w-24 text-center" />
               <button onclick="salvarRowPeriodo(${row.id})" class="text-green-600 hover:text-green-700 transition-colors" title="Salvar">
-                <i class="ph ph-check-circle text-lg"></i>
+                <i class="ph ph-check-circle text-base"></i>
               </button>
               <button onclick="toggleRowEdit(${row.id})" class="text-red-500 hover:text-red-600 transition-colors" title="Cancelar">
-                <i class="ph ph-x-circle text-lg"></i>
+                <i class="ph ph-x-circle text-base"></i>
               </button>
             </div>
           </td>
-          <td class="py-4 px-6 text-center text-[#038201] font-semibold">${conciliados}</td>
-          <td class="py-4 px-6 text-center text-amber-500 font-semibold">${row.divergencias}</td>
-          <td class="py-4 px-6 text-center">
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${row.taxa_sucesso >= 80 ? 'bg-green-50 text-[#038201]' : 'bg-amber-50 text-amber-600'} text-xs font-bold">
+          <td class="py-3.5 px-3">
+            ${renderBancosBadges(info.bancosList)}
+          </td>
+          <td class="py-3.5 px-2.5 text-center text-[#038201] font-bold text-sm">
+            ${conciliados}
+          </td>
+          <td class="py-3.5 px-2.5 text-center text-amber-500 font-bold text-sm">
+            ${row.divergencias}
+          </td>
+          <td class="py-3.5 px-2.5 text-center whitespace-nowrap">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full ${row.taxa_sucesso >= 80 ? 'bg-green-50 text-[#038201]' : 'bg-amber-50 text-amber-600'} text-xs font-bold">
               ${sucesso}%
             </span>
           </td>
-          <td class="py-4 px-6 text-right">
-            <div class="flex items-center justify-end gap-2">
-              <button onclick="abrirModalAnotacao(${row.id})" class="inline-flex items-center justify-center w-9 h-9 rounded-xl ${row.anotacao ? 'bg-amber-100 text-amber-600 hover:bg-amber-500' : 'bg-gray-50 text-gray-400 hover:bg-amber-500'} hover:text-white transition-all shadow-sm group" title="Anotações">
-                <i class="ph ph-notebook text-lg transition-transform group-hover:-translate-y-0.5"></i>
+          <td class="py-3.5 px-3 sm:px-4 text-right whitespace-nowrap">
+            <div class="flex items-center justify-end gap-1.5">
+              <button onclick="abrirModalAnotacao(${row.id})" class="inline-flex items-center justify-center w-8 h-8 rounded-lg ${row.anotacao ? 'bg-amber-100 text-amber-600 hover:bg-amber-500' : 'bg-gray-100 text-gray-500 hover:bg-amber-500'} hover:text-white transition-all shadow-xs group" title="Anotações">
+                <i class="ph ph-notebook text-base transition-transform group-hover:-translate-y-0.5"></i>
               </button>
-              <button onclick="visualizarHistorico(${row.id}, ${row.perfeitos}, ${row.historico}, ${row.desmembrados}, ${saidas}, ${row.divergencias}, ${row.taxa_sucesso}, '${esc(row.periodo || '')}')" class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-blue-50 text-blue-500 hover:bg-blue-500 hover:text-white transition-all shadow-sm group" title="Visualizar Detalhes">
-                <i class="ph ph-eye text-lg transition-transform group-hover:-translate-y-0.5"></i>
+              <button onclick="visualizarHistorico(${row.id}, ${row.perfeitos}, ${row.historico}, ${row.desmembrados}, ${saidas}, ${row.divergencias}, ${row.taxa_sucesso}, '${esc(row.periodo || '')}')" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-xs group" title="Ver mais (Visualizar Detalhes)">
+                <i class="ph ph-eye text-base transition-transform group-hover:-translate-y-0.5"></i>
               </button>
-              <button onclick="downloadHistorico(${row.id})" class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-green-50 text-[#038201] hover:bg-[#038201] hover:text-white transition-all shadow-sm group" title="Baixar Arquivo Morto">
-                <i class="ph ph-download-simple text-lg transition-transform group-hover:-translate-y-0.5"></i>
+              <button onclick="downloadHistorico(${row.id})" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 text-[#038201] hover:bg-[#038201] hover:text-white transition-all shadow-xs group" title="Baixar Planilha">
+                <i class="ph ph-download-simple text-base transition-transform group-hover:-translate-y-0.5"></i>
               </button>
-              <button onclick="excluirHistorico(${row.id})" class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-sm group" title="Excluir Histórico">
-                <i class="ph ph-trash text-lg transition-transform group-hover:-translate-y-0.5"></i>
+              <button onclick="excluirHistorico(${row.id})" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-xs group" title="Apagar Histórico">
+                <i class="ph ph-trash text-base transition-transform group-hover:-translate-y-0.5"></i>
               </button>
             </div>
           </td>
@@ -1420,18 +1460,26 @@
       function toggleEditPeriodo() {
         const view = document.getElementById('periodo-view');
         const edit = document.getElementById('periodo-edit');
+        if (!view || !edit) return;
         if (view.classList.contains('hidden')) {
           view.classList.remove('hidden');
           edit.classList.add('hidden');
         } else {
           view.classList.add('hidden');
           edit.classList.remove('hidden');
-          document.getElementById('periodo-input').value = _currentPeriodo;
+          const info = extractPeriodoAndBancos(_currentPeriodo || '');
+          const input = document.getElementById('periodo-input');
+          if (input) {
+            input.value = info.periodo === 'Desconhecido' ? '' : info.periodo;
+            input.dataset.rawPeriodo = _currentPeriodo || '';
+            input.focus();
+          }
         }
       }
 
       async function salvarPeriodo() {
         const input = document.getElementById('periodo-input');
+        if (!input) return;
         const novoValor = input.value.trim();
         if (!novoValor) return;
 
@@ -1440,16 +1488,23 @@
           return;
         }
 
+        const rawOriginal = input.dataset.rawPeriodo || _currentPeriodo || '';
+        let valorFinal = novoValor;
+        if (rawOriginal.includes('| Bancos:')) {
+          const parts = rawOriginal.split('| Bancos:');
+          valorFinal = `${novoValor} | Bancos: ${parts[1].trim()}`;
+        }
+
         try {
           const resp = await fetch(API_BASE + '/api/historico/' + _currentId, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ periodo: novoValor })
+            body: JSON.stringify({ periodo: valorFinal })
           });
           if (!resp.ok) throw new Error('Falha ao atualizar período.');
 
-          _currentPeriodo = novoValor;
-          document.getElementById('periodo-text').innerHTML = formatPeriodoBancos(novoValor);
+          _currentPeriodo = valorFinal;
+          document.getElementById('periodo-text').innerHTML = formatPeriodoBancos(valorFinal);
           toggleEditPeriodo();
           showToast('Sucesso', 'Período atualizado com sucesso.', 'success');
         } catch (err) {
@@ -1482,26 +1537,41 @@
       function toggleRowEdit(id, currentValue = '') {
         const view = document.getElementById('td-periodo-view-' + id);
         const edit = document.getElementById('td-periodo-edit-' + id);
+        if (!view || !edit) return;
         if (view.classList.contains('hidden')) {
           view.classList.remove('hidden');
           edit.classList.add('hidden');
         } else {
           view.classList.add('hidden');
           edit.classList.remove('hidden');
-          document.getElementById('td-periodo-input-' + id).value = currentValue;
+          const info = extractPeriodoAndBancos(currentValue);
+          const input = document.getElementById('td-periodo-input-' + id);
+          if (input) {
+            input.value = info.periodo === 'Desconhecido' ? '' : info.periodo;
+            input.dataset.rawPeriodo = currentValue;
+            input.focus();
+          }
         }
       }
 
       async function salvarRowPeriodo(id) {
         const input = document.getElementById('td-periodo-input-' + id);
+        if (!input) return;
         const novoValor = input.value.trim();
         if (!novoValor) return;
+
+        const rawOriginal = input.dataset.rawPeriodo || '';
+        let valorFinal = novoValor;
+        if (rawOriginal.includes('| Bancos:')) {
+          const parts = rawOriginal.split('| Bancos:');
+          valorFinal = `${novoValor} | Bancos: ${parts[1].trim()}`;
+        }
 
         try {
           const resp = await fetch(API_BASE + '/api/historico/' + id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ periodo: novoValor })
+            body: JSON.stringify({ periodo: valorFinal })
           });
           if (!resp.ok) throw new Error('Falha ao atualizar período na tabela.');
 
