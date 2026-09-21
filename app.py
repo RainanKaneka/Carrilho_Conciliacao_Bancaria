@@ -424,28 +424,33 @@ async def conciliar(
         except Exception as e:
             print(f"Aviso: Erro ao extrair período: {e}")
 
-        # Upload arquivo para Supabase Storage
+        # Upload arquivo para Supabase Storage e Gravação de Histórico (com tolerância a falhas)
         file_name = f"{uuid.uuid4()}_{caminho_saida.name}"
-        with open(caminho_saida, 'rb') as f:
-            supabase_client.storage.from_("arquivos_antigos").upload(
-                file_name,
-                f.read(),
-                {"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
-            )
-            
-        # Gravar histórico no Banco de Dados (Supabase PostgreSQL)
-        novo_registro = {
-            "perfeitos": qtd_perfeitos,
-            "historico": qtd_historico,
-            "desmembrados": qtd_desmembrado,
-            "divergencias": qtd_divergencias,
-            "taxa_sucesso": taxa_sucesso,
-            "caminho_arquivo": file_name,
-            "periodo": periodo_str,
-            "saidas_estornos": qtd_saidas_estornos
-        }
-        res_db = supabase_client.table("conciliacoes").insert(novo_registro).execute()
-        novo_id = res_db.data[0]["id"] if res_db.data else None
+        novo_id = None
+        try:
+            if supabase_client:
+                with open(caminho_saida, 'rb') as f:
+                    supabase_client.storage.from_("arquivos_antigos").upload(
+                        file_name,
+                        f.read(),
+                        {"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+                    )
+                    
+                novo_registro = {
+                    "perfeitos": qtd_perfeitos,
+                    "historico": qtd_historico,
+                    "desmembrados": qtd_desmembrado,
+                    "divergencias": qtd_divergencias,
+                    "taxa_sucesso": taxa_sucesso,
+                    "caminho_arquivo": file_name,
+                    "periodo": periodo_str,
+                    "saidas_estornos": qtd_saidas_estornos
+                }
+                res_db = supabase_client.table("conciliacoes").insert(novo_registro).execute()
+                novo_id = res_db.data[0]["id"] if res_db.data else None
+                logger.info(f"Conciliação salva com sucesso no Supabase (ID: {novo_id}).")
+        except Exception as err_supa:
+            logger.warning(f"Aviso: Não foi possível persistir no Supabase (Storage/DB): {err_supa}")
 
         # Devolve o JSON com os resultados e o ficheiro
         return {

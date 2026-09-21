@@ -1772,7 +1772,13 @@
           }
         } catch (err) {
           console.error(err);
-          errorDiv.textContent = err.message === 'Invalid login credentials' ? 'Usuário ou senha incorretos.' : err.message;
+          let msg = err.message || '';
+          if (msg === 'Invalid login credentials') {
+            msg = 'Usuário ou senha incorretos.';
+          } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || !navigator.onLine) {
+            msg = 'Falha de conexão com o banco/autenticação (DNS/Supabase). Verifique sua internet ou se o projeto Supabase está ativo.';
+          }
+          errorDiv.textContent = msg;
           errorDiv.classList.remove('hidden');
         } finally {
           btn.innerHTML = originalText;
