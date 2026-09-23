@@ -832,6 +832,50 @@ class TestEngineConfigurability(unittest.TestCase):
         self.assertEqual(len(res_restrito["5_Divergencias_Pendentes"]), 2)
 
 
+class TestSecurityCORS(unittest.TestCase):
+    """Testa a blindagem de segurança de CORS da API FastAPI."""
+
+    def test_cors_config_valores(self):
+        """Verifica se as origens padrão e regex do Render estão definidas no config."""
+        import config
+        self.assertIn("http://localhost:8000", config.DEFAULT_CORS_ORIGINS)
+        self.assertIn("http://localhost:3000", config.DEFAULT_CORS_ORIGINS)
+        self.assertIn("http://localhost:5173", config.DEFAULT_CORS_ORIGINS)
+        self.assertEqual(config.CORS_ALLOW_ORIGIN_REGEX, r"https://.*\.onrender\.com")
+
+    def test_cors_env_parsing(self):
+        """Valida parsing de origens via variável de ambiente CORS_ORIGINS."""
+        from config import _get_list_env
+
+        # String separada por vírgula
+        os.environ["__TEST_CORS"] = "https://app1.com, https://app2.com"
+        try:
+            origins = _get_list_env("__TEST_CORS", [])
+            self.assertEqual(origins, ["https://app1.com", "https://app2.com"])
+        finally:
+            os.environ.pop("__TEST_CORS", None)
+
+    def test_cors_middleware_permite_origens_autorizadas_e_bloqueia_nao_autorizadas(self):
+        """Valida que o middleware CORS autoriza localhost e Render, mas bloqueia origens externas desconhecidas."""
+        from fastapi.testclient import TestClient
+        from app import app
+
+        client = TestClient(app)
+
+        # 1. Localhost autorizado
+        res_local = client.get("/", headers={"Origin": "http://localhost:8000"})
+        self.assertEqual(res_local.headers.get("access-control-allow-origin"), "http://localhost:8000")
+
+        # 2. Render autorizado via regex
+        res_render = client.get("/", headers={"Origin": "https://carrilho-distribuidora.onrender.com"})
+        self.assertEqual(res_render.headers.get("access-control-allow-origin"), "https://carrilho-distribuidora.onrender.com")
+
+        # 3. Origem não autorizada (maliciosa) deve ser BLOQUEADA (sem cabeçalho Access-Control-Allow-Origin)
+        res_blocked = client.get("/", headers={"Origin": "https://site-malicioso.com"})
+        self.assertIsNone(res_blocked.headers.get("access-control-allow-origin"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
 

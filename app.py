@@ -78,11 +78,12 @@ class AnotacaoUpdate(BaseModel):
 # Importação do motor de conciliação (mesmo diretório)
 # ---------------------------------------------------------------------------
 try:
+    import config
     from conciliacao import DataCleaner, ReconciliationEngine, ExcelReporter
 except ImportError as exc:
     print(
-        f"[ERRO FATAL] Não foi possível importar 'conciliacao.py'.\n"
-        f"Certifique-se de que o arquivo 'conciliacao.py' está na mesma pasta.\n"
+        f"[ERRO FATAL] Não foi possível importar 'conciliacao.py' ou 'config.py'.\n"
+        f"Certifique-se de que os arquivos estão na mesma pasta.\n"
         f"Detalhe: {exc}"
     )
     sys.exit(1)
@@ -118,13 +119,20 @@ app = FastAPI(
 )
 
 # ---------------------------------------------------------------------------
-# CORS — Permite requisições do front-end rodando localmente no navegador
+# CORS — Configuração restrita e segura de origens permitidas
 # ---------------------------------------------------------------------------
+# Permite apenas origens locais autorizadas (localhost / 127.0.0.1 em portas conhecidas)
+# e domínios de produção (Render *.onrender.com ou configurados via CORS_ORIGINS)
+allow_creds = True
+if "*" in config.CORS_ORIGINS and not config.CORS_ALLOW_ORIGIN_REGEX:
+    allow_creds = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # Em produção, substitua por domínio específico
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=config.CORS_ORIGINS,
+    allow_origin_regex=config.CORS_ALLOW_ORIGIN_REGEX,
+    allow_credentials=allow_creds,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
 )
 
