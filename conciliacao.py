@@ -442,6 +442,16 @@ class ReconciliationEngine:
         if self.df_argos.empty or self.df_bank.empty:
             for k in resultados.keys():
                 resultados[k] = pd.DataFrame(columns=['Banco', 'Cliente', 'Valor', 'Data', 'Histórico', 'Baixas', 'Data Baixa', 'Motivo Divergência'])
+            
+            soma_input = self.df_argos['Valor'].sum() if not self.df_argos.empty else 0.0
+            resultados['6_Resumo_Integridade'] = pd.DataFrame([
+                {"Métrica": "Total Input Argos", "Valor": soma_input},
+                {"Métrica": "Total Output Conciliado", "Valor": 0.0},
+                {"Métrica": "Total Output Divergências (Falta Banco)", "Valor": 0.0},
+                {"Métrica": "Total Output (Conciliado + Divergências)", "Valor": 0.0},
+                {"Métrica": "Diferença (Perda/Duplicação)", "Valor": soma_input},
+                {"Métrica": "Status da Integridade", "Valor": "OK - Nenhum centavo perdido ou duplicado" if soma_input == 0 else "ERRO (Perda/Duplicação identificada)"},
+            ])
             return resultados
 
         argos_pendentes = self.df_argos.copy()
@@ -842,14 +852,29 @@ class ReconciliationEngine:
             if not resultados[k].empty:
                 soma_output += resultados[k]['Valor'].sum()
                 
+        soma_divergencia = 0.0
         if not resultados['5_Divergencias_Pendentes'].empty:
             df_div = resultados['5_Divergencias_Pendentes']
-            soma_output += df_div[df_div['Motivo Divergência'] == 'Falta no Banco']['Valor'].sum()
+            soma_divergencia = df_div[df_div['Motivo Divergência'] == 'Falta no Banco']['Valor'].sum()
+            soma_output += soma_divergencia
             
-        if abs(soma_input - soma_output) > TOLERANCIA_INTEGRIDADE:
+        diff_integridade = abs(soma_input - soma_output)
+        status_msg = "OK - Nenhum centavo perdido ou duplicado"
+        if diff_integridade > TOLERANCIA_INTEGRIDADE:
             msg = f"CRÍTICO: Perda de integridade financeira! Input Argos: R$ {soma_input:.2f} | Output Argos: R$ {soma_output:.2f}"
             print(msg)
             warnings.warn(msg)
+            status_msg = "ERRO (Perda/Duplicação identificada)"
+
+        df_resumo = pd.DataFrame([
+            {"Métrica": "Total Input Argos", "Valor": round(soma_input, 2)},
+            {"Métrica": "Total Output Conciliado", "Valor": round(soma_output - soma_divergencia, 2)},
+            {"Métrica": "Total Output Divergências (Falta Banco)", "Valor": round(soma_divergencia, 2)},
+            {"Métrica": "Total Output (Conciliado + Divergências)", "Valor": round(soma_output, 2)},
+            {"Métrica": "Diferença (Perda/Duplicação)", "Valor": round(diff_integridade, 2)},
+            {"Métrica": "Status da Integridade", "Valor": status_msg},
+        ])
+        resultados['6_Resumo_Integridade'] = df_resumo
 
         return resultados
 
@@ -885,6 +910,10 @@ class ExcelReporter:
         
         for sheet_name, df in data_sheets.items():
             novo_nome_aba = sheet_name.replace('_', ' ')
+            if 'Resumo Integridade' in novo_nome_aba:
+                formatted_sheets[novo_nome_aba] = df
+                continue
+                
             if not df.empty:
                 df = df.rename(columns=mapa_colunas)
                 colunas_finais = [c for c in ordem_desejada if c in df.columns]
@@ -994,7 +1023,7 @@ class ExcelReporter:
                             else:
                                 cell.fill = fill_branco
 
-                        if col_name == 'VALOR DA BAIXA':
+                        if col_name == 'VALOR DA BAIXA' or (sheet_name == '6 Resumo Integridade' and col_name == 'VALOR' and row != 7):
                             cell.alignment = Alignment(horizontal='right', vertical='center', wrap_text=False)
                             if cell.value is not None:
                                 try:
@@ -1024,12 +1053,14 @@ class ExcelReporter:
                     
                     if col_name in ['BANCO', 'BANCO DA BAIXA']:
                         worksheet.column_dimensions[col_letter].width = max(max_length, 20)
-                    elif col_name == 'VALOR DA BAIXA':
+                    elif col_name == 'VALOR DA BAIXA' or col_name == 'VALOR':
                         worksheet.column_dimensions[col_letter].width = max(max_length + 6, 20)
                     elif 'DATA' in col_name:
                         worksheet.column_dimensions[col_letter].width = max(max_length + 2, 23)
                     elif col_name == 'OBSERVAÇÃO':
                         worksheet.column_dimensions[col_letter].width = max(max_length + 2, 40)
+                    elif col_name == 'MÉTRICA':
+                        worksheet.column_dimensions[col_letter].width = max(max_length + 2, 45)
                     else:
                         worksheet.column_dimensions[col_letter].width = min(max_length + 2, 50)
 

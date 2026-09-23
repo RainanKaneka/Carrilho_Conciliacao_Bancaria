@@ -271,6 +271,7 @@ class TestReconciliationEnginePipeline(unittest.TestCase):
             "3_Conciliado_Desmembrado",
             "4_Saidas_Estornos",
             "5_Divergencias_Pendentes",
+            "6_Resumo_Integridade",
         }
 
     def test_pipeline_retorna_todas_as_cinco_abas_padronizadas(self):
@@ -297,7 +298,10 @@ class TestReconciliationEnginePipeline(unittest.TestCase):
         self.assertEqual(set(resultado.keys()), self.chaves_obrigatorias)
         for chave, df in resultado.items():
             self.assertIsInstance(df, pd.DataFrame, f"A chave '{chave}' deve conter um DataFrame.")
-            self.assertEqual(list(df.columns), self.colunas_obrigatorias)
+            if chave == "6_Resumo_Integridade":
+                self.assertEqual(list(df.columns), ["Métrica", "Valor"])
+            else:
+                self.assertEqual(list(df.columns), self.colunas_obrigatorias)
 
     def test_pipeline_com_entradas_vazias_nao_lanca_excecao(self):
         """Pipeline executado com DataFrames vazios deve retornar as 5 abas vazias sem exceção."""
@@ -306,8 +310,12 @@ class TestReconciliationEnginePipeline(unittest.TestCase):
 
         self.assertEqual(set(resultado.keys()), self.chaves_obrigatorias)
         for chave, df in resultado.items():
-            self.assertTrue(df.empty)
-            self.assertEqual(set(df.columns), set(self.colunas_obrigatorias))
+            if chave == "6_Resumo_Integridade":
+                self.assertFalse(df.empty)
+                self.assertEqual(list(df.columns), ["Métrica", "Valor"])
+            else:
+                self.assertTrue(df.empty)
+                self.assertEqual(set(df.columns), set(self.colunas_obrigatorias))
 
 
 class TestRegrasConciliacao(unittest.TestCase):
