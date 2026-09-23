@@ -1,10 +1,13 @@
 *.xlsx
 *.xls
 *.csv
+*.pdf
 
 temp_*/
 temp_uploads/
 arquivos_antigos/
+mes_todo/
+quinzenal/
 
 __pycache__/
 *.pyc
@@ -16,10 +19,16 @@ env/
 
 # Arquivos locais e de desenvolvimento
 historico.db
+*.db
+*.sqlite
+*.sqlite3
+*.log
 scratch/
 debug_*.py
 migrate.py
 test.py
+test_*.py
+!test_conciliacao.py
 run_conciliacao.py
 implementation_plan.md
 task.md
