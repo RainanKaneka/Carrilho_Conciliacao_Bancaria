@@ -754,5 +754,84 @@ class TestExcelReporter(unittest.TestCase):
         self.assertAlmostEqual(soma_argos_inicial, soma_resultados, places=2)
 
 
+class TestConfig(unittest.TestCase):
+    """Testa o módulo de configuração central config.py e suas constantes."""
+
+    def test_valores_padrao_constantes(self):
+        """Verifica se os valores padrão das constantes de negócio estão corretos."""
+        import config
+        self.assertEqual(config.JANELA_DIAS, 31)
+        self.assertEqual(config.JANELA_DIAS_CENTAVOS, 3)
+        self.assertEqual(config.DIAS_ALERTA_TEMPORAL, 5)
+        self.assertAlmostEqual(config.TOLERANCIA_CENTAVOS, 1.50, places=2)
+        self.assertAlmostEqual(config.TOLERANCIA_DESCONTO_PIX, 15.00, places=2)
+        self.assertAlmostEqual(config.LIMIAR_VALOR_FALTANTE_DESMEMBRAR, 0.05, places=2)
+        self.assertAlmostEqual(config.TOLERANCIA_INTEGRIDADE, 0.01, places=2)
+        self.assertEqual(config.MAX_COMBINACOES, 4)
+
+    def test_helpers_variaveis_ambiente(self):
+        """Valida que os helpers _get_int_env e _get_float_env respeitam fallbacks e convertem valores."""
+        from config import _get_int_env, _get_float_env
+
+        os.environ["__TEST_INT_VAR"] = "42"
+        os.environ["__TEST_FLOAT_VAR"] = "99.9"
+        try:
+            self.assertEqual(_get_int_env("__TEST_INT_VAR", 10), 42)
+            self.assertAlmostEqual(_get_float_env("__TEST_FLOAT_VAR", 1.0), 99.9, places=2)
+            self.assertEqual(_get_int_env("__TEST_VAR_INEXISTENTE", 10), 10)
+            self.assertAlmostEqual(_get_float_env("__TEST_VAR_INEXISTENTE", 1.5), 1.5, places=2)
+        finally:
+            os.environ.pop("__TEST_INT_VAR", None)
+            os.environ.pop("__TEST_FLOAT_VAR", None)
+
+
+class TestEngineConfigurability(unittest.TestCase):
+    """Testa a possibilidade de customização e override das regras no ReconciliationEngine."""
+
+    def test_override_janela_dias_bloqueia_match_fora_da_janela(self):
+        """Se a janela for configurada para 3 dias, transações com 10 dias de diferença na Regra 1 não conciliam."""
+        # Dois registros com o mesmo valor para concorrer e acionar a validação de data da Regra 1
+        df_argos = pd.DataFrame([
+            {"Data": "01/06/2026", "Cliente": "CLI A", "Valor": 100.00, "Tipo Evento": "Pix"},
+            {"Data": "01/06/2026", "Cliente": "CLI B", "Valor": 100.00, "Tipo Evento": "Pix"},
+        ])
+        df_bank = pd.DataFrame([
+            {"Data": "11/06/2026", "Histórico": "PIX RECEBIDO", "Valor": 100.00, "Banco": "CAIXA"},
+            {"Data": "11/06/2026", "Histórico": "PIX RECEBIDO", "Valor": 100.00, "Banco": "CAIXA"},
+        ])
+
+        # Com a janela padrão de 31 dias, deve conciliar em 1_Conciliado_Perfeito
+        engine_padrao = ReconciliationEngine(df_argos, df_bank)
+        res_padrao = engine_padrao.execute_pipeline()
+        self.assertEqual(len(res_padrao["1_Conciliado_Perfeito"]), 2)
+
+        # Com override da janela_dias=3, não deve conciliar na Regra 1 e deve virar divergência
+        engine_restrito = ReconciliationEngine(df_argos, df_bank, janela_dias=3)
+        res_restrito = engine_restrito.execute_pipeline()
+        self.assertEqual(len(res_restrito["1_Conciliado_Perfeito"]), 0)
+        self.assertEqual(len(res_restrito["5_Divergencias_Pendentes"]), 4)
+
+    def test_override_tolerancia_centavos(self):
+        """Com tolerância de R$ 0.10, uma diferença de R$ 0.50 não concilia por aproximação."""
+        df_argos = pd.DataFrame([{
+            "Data": "01/06/2026", "Cliente": "CLI X", "Valor": 100.00, "Tipo Evento": "Pix"
+        }])
+        df_bank = pd.DataFrame([{
+            "Data": "02/06/2026", "Histórico": "PIX", "Valor": 100.50, "Banco": "CAIXA"
+        }])
+
+        # Tolerância padrão (1.50) concilia na regra 3.5 (aproximação de centavos)
+        engine_padrao = ReconciliationEngine(df_argos, df_bank)
+        res_padrao = engine_padrao.execute_pipeline()
+        self.assertEqual(len(res_padrao["1_Conciliado_Perfeito"]), 1)
+
+        # Tolerância customizada de 0.10 rejeita a aproximação
+        engine_restrito = ReconciliationEngine(df_argos, df_bank, tolerancia_centavos=0.10)
+        res_restrito = engine_restrito.execute_pipeline()
+        self.assertEqual(len(res_restrito["1_Conciliado_Perfeito"]), 0)
+        self.assertEqual(len(res_restrito["5_Divergencias_Pendentes"]), 2)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+

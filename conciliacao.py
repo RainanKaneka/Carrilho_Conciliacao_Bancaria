@@ -9,6 +9,18 @@ from openpyxl.utils import get_column_letter
 
 warnings.filterwarnings('ignore')
 
+import config
+from config import (
+    JANELA_DIAS,
+    JANELA_DIAS_CENTAVOS,
+    DIAS_ALERTA_TEMPORAL,
+    TOLERANCIA_CENTAVOS,
+    TOLERANCIA_DESCONTO_PIX,
+    LIMIAR_VALOR_FALTANTE_DESMEMBRAR,
+    TOLERANCIA_INTEGRIDADE,
+    MAX_COMBINACOES,
+)
+
 def parse_currency(val, default=None):
     """Função blindada para converter qualquer formato de dinheiro/moeda para float.
 
@@ -346,9 +358,24 @@ class DataCleaner:
 
 
 class ReconciliationEngine:
-    def __init__(self, df_argos, df_bank):
+    def __init__(
+        self,
+        df_argos,
+        df_bank,
+        janela_dias: int = config.JANELA_DIAS,
+        tolerancia_centavos: float = config.TOLERANCIA_CENTAVOS,
+        max_combinacoes: int = config.MAX_COMBINACOES,
+        tolerancia_desconto_pix: float = config.TOLERANCIA_DESCONTO_PIX,
+        janela_dias_centavos: int = config.JANELA_DIAS_CENTAVOS,
+    ):
         import pandas as pd
         
+        self.janela_dias = int(janela_dias) if janela_dias is not None else config.JANELA_DIAS
+        self.tolerancia_centavos = float(tolerancia_centavos) if tolerancia_centavos is not None else config.TOLERANCIA_CENTAVOS
+        self.max_combinacoes = int(max_combinacoes) if max_combinacoes is not None else config.MAX_COMBINACOES
+        self.tolerancia_desconto_pix = float(tolerancia_desconto_pix) if tolerancia_desconto_pix is not None else config.TOLERANCIA_DESCONTO_PIX
+        self.janela_dias_centavos = int(janela_dias_centavos) if janela_dias_centavos is not None else config.JANELA_DIAS_CENTAVOS
+
         self.df_argos = df_argos.copy() if isinstance(df_argos, pd.DataFrame) else pd.DataFrame()
         self.df_bank = df_bank.copy() if isinstance(df_bank, pd.DataFrame) else pd.DataFrame()
 
@@ -453,7 +480,7 @@ class ReconciliationEngine:
             palavras_dinheiro = ['pix', 'valor', 'reais', 'r$', 'pago', 'restante', 'baixa', 'comprovante']
             if match and not any(p in texto_hist_corrigido.lower() for p in palavras_dinheiro):
                 v_temp = parse_currency(match.group(1))
-                if v_temp is None or abs(v_temp - row_a['Valor']) > 15.0:
+                if v_temp is None or abs(v_temp - row_a['Valor']) > self.tolerancia_desconto_pix:
                     match = None
 
             if match:
@@ -479,12 +506,12 @@ class ReconciliationEngine:
                     candidatos = candidatos.sort_values(by='diff_dias')
                     
                     for j, row_b in candidatos.iterrows():
-                        if pd.isna(row_b['diff_dias']) or row_b['diff_dias'] <= 31: 
+                        if pd.isna(row_b['diff_dias']) or row_b['diff_dias'] <= self.janela_dias: 
                             valor_faltante = round(v_regex - row_a['Valor'], 2)
                             comb_encontrada = []
                             
                             # Tenta Desmembrar (OTIMIZADO)
-                            if valor_faltante > 0.05:
+                            if valor_faltante > LIMIAR_VALOR_FALTANTE_DESMEMBRAR:
                                 cliente_atual = row_a.get('Cliente', None)
                                 col_cliente = 'CLIENTES' if 'CLIENTES' in argos_pendentes.columns else 'Cliente'
                                 
@@ -492,26 +519,25 @@ class ReconciliationEngine:
                                 filter_mask = (
                                     (~argos_pendentes['ID_Argos'].isin(m_a)) & 
                                     (argos_pendentes['ID_Argos'] != row_a['ID_Argos']) &
-                                    (argos_pendentes['Valor'] <= valor_faltante + 1.50)
+                                    (argos_pendentes['Valor'] <= valor_faltante + self.tolerancia_centavos)
                                 )
                                 
                                 # TRAVA MESTRA: Só desmembra se for o MESMO cliente!
                                 if pd.notna(cliente_atual) and cliente_atual != 'CLIENTE NÃO INFORMADO':
                                     filter_mask = filter_mask & (argos_pendentes[col_cliente] == cliente_atual)
                                     
-                                # TRAVA DE DATA: Só busca notas próximas (+- 5 dias)
-                                # Para evitar roubar uma nota do dia 01/06 para fechar um desmembramento do dia 30/06
+                                # TRAVA DE DATA: Só busca notas próximas
                                 date_a = pd.to_datetime(row_a['Data'], format='%d/%m/%Y', errors='coerce')
                                 if pd.notna(date_a):
                                     diff_dias_notas = abs((pd.to_datetime(argos_pendentes['Data'], format='%d/%m/%Y', errors='coerce') - date_a).dt.days)
-                                    filter_mask = filter_mask & (diff_dias_notas <= 31)
+                                    filter_mask = filter_mask & (diff_dias_notas <= self.janela_dias)
                                     
                                 outras_notas = argos_pendentes[filter_mask]
                                 fast_notas = [(row['ID_Argos'], row['Valor'], row.to_dict()) for idx, row in outras_notas.iterrows()]
                                 
-                                for r in range(1, min(4, len(fast_notas) + 1)):
+                                for r in range(1, min(self.max_combinacoes, len(fast_notas) + 1)):
                                     for comb in itertools.combinations(fast_notas, r):
-                                        if abs(sum(item[1] for item in comb) - valor_faltante) <= 1.50:
+                                        if abs(sum(item[1] for item in comb) - valor_faltante) <= self.tolerancia_centavos:
                                             comb_encontrada = [item[2].copy() for item in comb]
                                             break
                                     if comb_encontrada: break
@@ -533,7 +559,7 @@ class ReconciliationEngine:
                                 break
                             
                             # Se não achou peças mas está dentro do desconto de R$ 15
-                            elif abs(row_a['Valor'] - v_regex) <= 15.0:
+                            elif abs(row_a['Valor'] - v_regex) <= self.tolerancia_desconto_pix:
                                 nota = row_a.to_dict().copy()
                                 nota['Baixas'] = row_b['Banco']
                                 nota['Data Baixa'] = row_b['Data']
@@ -561,7 +587,7 @@ class ReconciliationEngine:
             if len(palavras_nome) < 2:
                 continue
                 
-            candidatos = bank_pendentes[(abs(bank_pendentes['Valor'] - row_a['Valor']) <= 1.50) & (~bank_pendentes['ID_Bank'].isin(m_b))].copy()
+            candidatos = bank_pendentes[(abs(bank_pendentes['Valor'] - row_a['Valor']) <= self.tolerancia_centavos) & (~bank_pendentes['ID_Bank'].isin(m_b))].copy()
             if not candidatos.empty:
                 diff_dias = abs((pd.to_datetime(row_a['Data'], format='%d/%m/%Y', errors='coerce') - 
                                pd.to_datetime(candidatos['Data'], format='%d/%m/%Y', errors='coerce')).dt.days)
@@ -573,7 +599,7 @@ class ReconciliationEngine:
                     
                     # Verifica se as duas primeiras palavras do nome estão no histórico
                     if palavras_nome[0] in hist_banco and palavras_nome[1] in hist_banco:
-                        if pd.isna(row_b['diff_dias']) or row_b['diff_dias'] <= 31:
+                        if pd.isna(row_b['diff_dias']) or row_b['diff_dias'] <= self.janela_dias:
                             nota = row_a.to_dict().copy()
                             nota['Baixas'] = row_b['Banco']
                             nota['Data Baixa'] = row_b['Data']
@@ -673,7 +699,7 @@ class ReconciliationEngine:
                             # Pula, pois é um chute perigoso (Ex: 2 Chrystians no banco e 1 Emporio no sistema)
                             continue
                         
-                    if pd.notna(row_b['diff_dias']) and row_b['diff_dias'] <= 31:
+                    if pd.notna(row_b['diff_dias']) and row_b['diff_dias'] <= self.janela_dias:
                         nota = row_a.to_dict().copy()
                         nota['Baixas'] = row_b['Banco']
                         nota['Data Baixa'] = row_b['Data']
@@ -701,7 +727,7 @@ class ReconciliationEngine:
             
             if pd.notna(data_banco):
                 argos_candidatos['diff_dias'] = abs((pd.to_datetime(argos_candidatos['Data'], format='%d/%m/%Y', errors='coerce') - data_banco).dt.days)
-                argos_candidatos = argos_candidatos[argos_candidatos['diff_dias'] <= 31]
+                argos_candidatos = argos_candidatos[argos_candidatos['diff_dias'] <= self.janela_dias]
             
             if argos_candidatos.empty: continue
             
@@ -712,9 +738,9 @@ class ReconciliationEngine:
             for cliente, grupo in argos_candidatos.groupby(col_cliente):
                 if len(grupo) < 2: continue
                 fast_grupo = [(row['ID_Argos'], row['Valor'], row.to_dict()) for idx, row in grupo.iterrows()]
-                for r in range(2, min(4, len(fast_grupo) + 1)):
+                for r in range(2, min(self.max_combinacoes, len(fast_grupo) + 1)):
                     for comb in itertools.combinations(fast_grupo, r):
-                        if abs(sum(item[1] for item in comb) - valor_banco) <= 1.50:
+                        if abs(sum(item[1] for item in comb) - valor_banco) <= self.tolerancia_centavos:
                             comb_encontrada = comb
                             break
                     if comb_encontrada: break
@@ -740,7 +766,7 @@ class ReconciliationEngine:
         if not argos_pendentes.empty and not bank_pendentes.empty:
             for i, row_a in argos_pendentes.iterrows():
                 candidatos = bank_pendentes[(abs(bank_pendentes['Valor'] - row_a['Valor']) > 0) & 
-                                            (abs(bank_pendentes['Valor'] - row_a['Valor']) <= 1.50) & 
+                                            (abs(bank_pendentes['Valor'] - row_a['Valor']) <= self.tolerancia_centavos) & 
                                             (~bank_pendentes['ID_Bank'].isin(m_b))].copy()
                 if not candidatos.empty:
                     candidatos['diff_dias'] = abs((pd.to_datetime(row_a['Data'], format='%d/%m/%Y', errors='coerce') - 
@@ -748,7 +774,7 @@ class ReconciliationEngine:
                     candidatos = candidatos.sort_values(by='diff_dias')
                     
                     for j, row_b in candidatos.iterrows():
-                        if pd.notna(row_b['diff_dias']) and row_b['diff_dias'] <= 3:
+                        if pd.notna(row_b['diff_dias']) and row_b['diff_dias'] <= self.janela_dias_centavos:
                             nota = row_a.to_dict().copy()
                             nota['Baixas'] = row_b['Banco']
                             nota['Data Baixa'] = row_b['Data']
@@ -820,7 +846,7 @@ class ReconciliationEngine:
             df_div = resultados['5_Divergencias_Pendentes']
             soma_output += df_div[df_div['Motivo Divergência'] == 'Falta no Banco']['Valor'].sum()
             
-        if abs(soma_input - soma_output) > 0.01:
+        if abs(soma_input - soma_output) > TOLERANCIA_INTEGRIDADE:
             msg = f"CRÍTICO: Perda de integridade financeira! Input Argos: R$ {soma_input:.2f} | Output Argos: R$ {soma_output:.2f}"
             print(msg)
             warnings.warn(msg)
@@ -831,10 +857,10 @@ class ReconciliationEngine:
 
 
 class ExcelReporter:
-    LIMITE_DIAS_ALERTA_TEMPORAL = 5
+    LIMITE_DIAS_ALERTA_TEMPORAL = config.DIAS_ALERTA_TEMPORAL
 
     @staticmethod
-    def generate_report(data_sheets: dict, output_path: str, dias_alerta_temporal: int = 5):
+    def generate_report(data_sheets: dict, output_path: str, dias_alerta_temporal: int = config.DIAS_ALERTA_TEMPORAL):
         formatted_sheets = {}
         
         mapa_colunas = {
