@@ -9,27 +9,71 @@ from openpyxl.utils import get_column_letter
 
 warnings.filterwarnings('ignore')
 
-def parse_currency(val):
-    """Função blindada para converter qualquer formato de dinheiro para número"""
-    if pd.isna(val): return None
-    if isinstance(val, (int, float)): return float(val)
+def parse_currency(val, default=None):
+    """Função blindada para converter qualquer formato de dinheiro/moeda para float.
+
+    Suporta:
+    - Formato brasileiro com milhar e vírgula: "1.234,56"
+    - Formato com R$: "R$ 1.500,00", "R$512,50"
+    - Numéricos diretos: int, float
+    - Strings nulas, vazias ou inválidas retornam default (None por padrão).
+    """
+    if pd.isna(val):
+        return default
+    if isinstance(val, (int, float)):
+        return float(val)
     val = str(val).upper().replace('R$', '').strip()
+    if not val:
+        return default
     if '.' in val and ',' in val:
         val = val.replace('.', '').replace(',', '.')
     elif ',' in val:
         val = val.replace(',', '.')
     try:
         return float(val)
-    except:
-        return None
+    except (ValueError, TypeError):
+        return default
+
+
+def safe_float(val, default=0.0):
+    """Atalho blindado para parse_currency com fallback padrão 0.0."""
+    return parse_currency(val, default=default)
 
 
 class DataCleaner:
+    @staticmethod
+    def _detect_bank_from_content(df: pd.DataFrame, file_path: str = "") -> str:
+        """Detecção inteligente do banco analisando cabeçalhos e conteúdo inicial do arquivo."""
+        try:
+            content = ' '.join(str(c).lower() for c in df.columns)
+            content += ' ' + ' '.join(str(v).lower() for v in df.head(30).values.flatten())
+            
+            if "caixa econ" in content or "cef" in content or "caixa econômica" in content:
+                return "CAIXA ECONOMICA"
+            if "banese" in content or "banco do estado de sergipe" in content:
+                return "BANESE"
+            if "banco do nordeste" in content or "bnb" in content:
+                return "BNB"
+        except Exception:
+            pass
+            
+        nome_arquivo = str(file_path).lower()
+        if 'caixa' in nome_arquivo: 
+            return 'CAIXA ECONOMICA'
+        elif 'banese' in nome_arquivo: 
+            return 'BANESE'
+            
+        return "BANCO DESCONHECIDO"
+
     @staticmethod
     def clean_argos(file_path: str) -> pd.DataFrame:
         try:
             import pandas as pd
             df = pd.read_excel(file_path, engine='openpyxl')
+            
+            banco_detectado = DataCleaner._detect_bank_from_content(df, file_path)
+            if banco_detectado == "BANCO DESCONHECIDO":
+                banco_detectado = "ARGOS"
             
             header_idx = None
             cols_str = ' '.join(str(c).lower() for c in df.columns)
@@ -71,26 +115,10 @@ class DataCleaner:
             if 'Banco' not in df.columns: df['Banco'] = ''
             if 'Cliente' not in df.columns: df['Cliente'] = 'CLIENTE NÃO INFORMADO'
             
-            nome_arquivo = str(file_path).lower()
-            banco_nome = "ARGOS"
-            if 'caixa' in nome_arquivo: banco_nome = 'CAIXA ECONOMICA'
-            elif 'banese' in nome_arquivo: banco_nome = 'BANESE'
-
-            df['Banco'] = df['Banco'].fillna(banco_nome)
-            df['Banco'] = df['Banco'].replace(r'^\s*$', banco_nome, regex=True)
+            df['Banco'] = df['Banco'].fillna(banco_detectado)
+            df['Banco'] = df['Banco'].replace(r'^\s*$', banco_detectado, regex=True)
             
             df = df.dropna(subset=['Valor'])
-            
-            def parse_currency(val):
-                if pd.isna(val): return None
-                if isinstance(val, (int, float)): return float(val)
-                val = str(val).upper().replace('R$', '').strip()
-                if '.' in val and ',' in val:
-                    val = val.replace('.', '').replace(',', '.')
-                elif ',' in val:
-                    val = val.replace(',', '.')
-                try: return float(val)
-                except: return None
 
             # NOVO PARSER DE DATA BLINDADO (Padrão BR)
             def parse_date_br(val):
@@ -101,7 +129,8 @@ class DataCleaner:
                 try:
                     partes = val_str.split('/')
                     if len(partes) == 2:
-                        val_str = f"{val_str}/2026"
+                        current_year = datetime.datetime.now().year
+                        val_str = f"{val_str}/{current_year}"
                     return pd.to_datetime(val_str, dayfirst=True).strftime('%d/%m/%Y')
                 except:
                     return val_str
@@ -189,18 +218,6 @@ class DataCleaner:
                                     })
         
         df = pd.DataFrame(data)
-        def safe_float(val):
-            if pd.isna(val): return 0.0
-            val = str(val).upper().replace('R$', '').strip()
-            if '.' in val and ',' in val:
-                val = val.replace('.', '').replace(',', '.')
-            elif ',' in val:
-                val = val.replace(',', '.')
-            try:
-                return float(val)
-            except:
-                return 0.0
-                
         if not df.empty:
             df['Valor'] = df['Valor'].apply(safe_float)
             df['Banco'] = 'NATURE'
@@ -238,18 +255,6 @@ class DataCleaner:
                             'Tipo': tipo
                         })
         df = pd.DataFrame(data)
-        def safe_float(val):
-            if pd.isna(val): return 0.0
-            val = str(val).upper().replace('R$', '').strip()
-            if '.' in val and ',' in val:
-                val = val.replace('.', '').replace(',', '.')
-            elif ',' in val:
-                val = val.replace(',', '.')
-            try:
-                return float(val)
-            except:
-                return 0.0
-                
         if not df.empty:
             df['Valor'] = df['Valor'].apply(safe_float)
             df['Banco'] = 'BNB'
@@ -273,6 +278,8 @@ class DataCleaner:
                     return DataCleaner._read_nature_pdf(file_path)
                 
             df = pd.read_excel(file_path, engine='openpyxl')
+            
+            banco_detectado = DataCleaner._detect_bank_from_content(df, file_path)
             
             header_idx = None
             cols_str = ' '.join(str(c).lower() for c in df.columns)
@@ -308,17 +315,6 @@ class DataCleaner:
             if 'Tipo' not in df.columns: df['Tipo'] = ''
             
             df = df.dropna(subset=['Valor'])
-            
-            def parse_currency(val):
-                if pd.isna(val): return None
-                if isinstance(val, (int, float)): return float(val)
-                val = str(val).upper().replace('R$', '').strip()
-                if '.' in val and ',' in val:
-                    val = val.replace('.', '').replace(',', '.')
-                elif ',' in val:
-                    val = val.replace(',', '.')
-                try: return float(val)
-                except: return None
 
             def parse_date_br(val):
                 import datetime
@@ -328,7 +324,8 @@ class DataCleaner:
                 try:
                     partes = val_str.split('/')
                     if len(partes) == 2:
-                        val_str = f"{val_str}/2026"
+                        current_year = datetime.datetime.now().year
+                        val_str = f"{val_str}/{current_year}"
                     return pd.to_datetime(val_str, dayfirst=True).strftime('%d/%m/%Y')
                 except:
                     return val_str
@@ -339,11 +336,7 @@ class DataCleaner:
             df = df[df['Valor'] > 0]
             df['Histórico'] = df['Histórico'].fillna('')
             
-            nome_arquivo = str(file_path).lower()
-            banco_nome = "BANCO DESCONHECIDO"
-            if 'caixa' in nome_arquivo: banco_nome = 'CAIXA ECONOMICA'
-            elif 'banese' in nome_arquivo: banco_nome = 'BANESE'
-            df['Banco'] = banco_nome
+            df['Banco'] = banco_detectado
             
             return df
         except Exception as e:
@@ -360,19 +353,6 @@ class ReconciliationEngine:
         self.df_bank = df_bank.copy() if isinstance(df_bank, pd.DataFrame) else pd.DataFrame()
 
         # BLINDAGEM: Garante que todos os valores monetários são floats matemáticos válidos
-        def safe_float(val):
-            if pd.isna(val): return 0.0
-            if isinstance(val, (int, float)): return float(val)
-            val = str(val).upper().replace('R$', '').strip()
-            if '.' in val and ',' in val:
-                val = val.replace('.', '').replace(',', '.')
-            elif ',' in val:
-                val = val.replace(',', '.')
-            try:
-                return float(val)
-            except:
-                return 0.0
-
         if not self.df_argos.empty and 'Valor' in self.df_argos.columns:
             self.df_argos['Valor'] = self.df_argos['Valor'].apply(safe_float)
             
@@ -472,19 +452,13 @@ class ReconciliationEngine:
             # Isso evita extrair uma data (ex: "15/06" virar R$ 15,06 e roubar depósitos)
             palavras_dinheiro = ['pix', 'valor', 'reais', 'r$', 'pago', 'restante', 'baixa', 'comprovante']
             if match and not any(p in texto_hist_corrigido.lower() for p in palavras_dinheiro):
-                val_str_temp = match.group(1).replace('.', '').replace(',', '.')
-                try: 
-                    v_temp = float(val_str_temp)
-                    if abs(v_temp - row_a['Valor']) > 15.0:
-                        match = None
-                except:
+                v_temp = parse_currency(match.group(1))
+                if v_temp is None or abs(v_temp - row_a['Valor']) > 15.0:
                     match = None
 
             if match:
-                val_str = match.group(1).replace('.', '').replace(',', '.')
-                try: 
-                    v_regex = float(val_str)
-                except: 
+                v_regex = parse_currency(match.group(1))
+                if v_regex is None:
                     continue
 
                 # Extrai possível data do histórico para usar de referência
@@ -832,14 +806,35 @@ class ReconciliationEngine:
                 df = df[ordem_colunas]
             resultados[k] = df
 
+        # ==========================================
+        # VALIDAÇÃO DE SOMA (INTEGRIDADE FINANCEIRA)
+        # ==========================================
+        soma_input = self.df_argos['Valor'].sum() if not self.df_argos.empty else 0.0
+        soma_output = 0.0
+        
+        for k in ['1_Conciliado_Perfeito', '2_Conciliado_Via_Historico', '3_Conciliado_Desmembrado']:
+            if not resultados[k].empty:
+                soma_output += resultados[k]['Valor'].sum()
+                
+        if not resultados['5_Divergencias_Pendentes'].empty:
+            df_div = resultados['5_Divergencias_Pendentes']
+            soma_output += df_div[df_div['Motivo Divergência'] == 'Falta no Banco']['Valor'].sum()
+            
+        if abs(soma_input - soma_output) > 0.01:
+            msg = f"CRÍTICO: Perda de integridade financeira! Input Argos: R$ {soma_input:.2f} | Output Argos: R$ {soma_output:.2f}"
+            print(msg)
+            warnings.warn(msg)
+
         return resultados
 
 
 
 
 class ExcelReporter:
+    LIMITE_DIAS_ALERTA_TEMPORAL = 5
+
     @staticmethod
-    def generate_report(data_sheets: dict, output_path: str):
+    def generate_report(data_sheets: dict, output_path: str, dias_alerta_temporal: int = 5):
         formatted_sheets = {}
         
         mapa_colunas = {
@@ -867,8 +862,27 @@ class ExcelReporter:
             if not df.empty:
                 df = df.rename(columns=mapa_colunas)
                 colunas_finais = [c for c in ordem_desejada if c in df.columns]
-                df = df[colunas_finais]
-                df['OBSERVAÇÃO'] = ''
+                df = df[colunas_finais].copy()
+                
+                # Alerta temporal para diferença de datas entre pagamento e baixa
+                observacoes = []
+                has_pgto = 'DATA DO PAGAMENTO' in df.columns
+                has_baixa = 'DATA DA BAIXA' in df.columns
+                
+                if has_pgto and has_baixa:
+                    dt_pgto = pd.to_datetime(df['DATA DO PAGAMENTO'], dayfirst=True, errors='coerce')
+                    dt_baixa = pd.to_datetime(df['DATA DA BAIXA'], dayfirst=True, errors='coerce')
+                    diff_dias = (dt_pgto - dt_baixa).abs().dt.days
+                    
+                    for diff in diff_dias:
+                        if pd.notna(diff) and diff > dias_alerta_temporal:
+                            observacoes.append(f"⚠️ Alerta Temporal: Diferença de {int(diff)} dias entre pagamento e baixa")
+                        else:
+                            observacoes.append('')
+                else:
+                    observacoes = [''] * len(df)
+                    
+                df['OBSERVAÇÃO'] = observacoes
             else:
                 df = pd.DataFrame(columns=[c for c in ordem_desejada if c != 'MOTIVO DIVERGÊNCIA'] + ['OBSERVAÇÃO'])
             
@@ -890,15 +904,23 @@ class ExcelReporter:
                 header_fill = PatternFill(start_color='266C40', end_color='266C40', fill_type='solid')
                 fill_verde_claro = PatternFill(start_color='719C82', end_color='719C82', fill_type='solid')
                 fill_branco = PatternFill(start_color='FFFFFF', end_color='FFFFFF', fill_type='solid')
+                fill_alerta = PatternFill(start_color='FFF2CC', end_color='FFF2CC', fill_type='solid')
                 
                 font_branca_bold = Font(color='FFFFFF', bold=True)
                 font_preta_bold = Font(color='000000', bold=True)
+                font_alerta = Font(color='8A5300', bold=True)
                 
                 borda_fina = Border(
                     left=Side(border_style='thin', color='356A1C'),
                     right=Side(border_style='thin', color='356A1C'),
                     top=Side(border_style='thin', color='356A1C'),
                     bottom=Side(border_style='thin', color='356A1C')
+                )
+                borda_alerta = Border(
+                    left=Side(border_style='thin', color='D69E2E'),
+                    right=Side(border_style='thin', color='D69E2E'),
+                    top=Side(border_style='thin', color='D69E2E'),
+                    bottom=Side(border_style='thin', color='D69E2E')
                 )
 
                 col_indices = {str(worksheet.cell(row=1, column=i).value).upper(): i for i in range(1, worksheet.max_column + 1)}
@@ -913,6 +935,11 @@ class ExcelReporter:
                 for row in range(2, worksheet.max_row + 1):
                     is_zebra = (row % 2 == 0)
 
+                    obs_cell_val = ""
+                    if 'OBSERVAÇÃO' in col_indices:
+                        obs_cell_val = str(worksheet.cell(row=row, column=col_indices['OBSERVAÇÃO']).value or '')
+                    tem_alerta_temporal = "Alerta Temporal" in obs_cell_val
+
                     for col_name, col_idx in col_indices.items():
                         cell = worksheet.cell(row=row, column=col_idx)
                         
@@ -920,12 +947,19 @@ class ExcelReporter:
                         
                         if sheet_name == '4 Saidas Estornos' and col_name == 'VALOR DA BAIXA':
                             cell.font = Font(color='FF0000', bold=True)
+                        elif tem_alerta_temporal and col_name in ['DATA DO PAGAMENTO', 'DATA DA BAIXA', 'OBSERVAÇÃO']:
+                            cell.font = font_alerta
                         else:
                             cell.font = font_preta_bold
                             
-                        cell.border = borda_fina
+                        if tem_alerta_temporal and col_name in ['DATA DO PAGAMENTO', 'DATA DA BAIXA', 'OBSERVAÇÃO']:
+                            cell.border = borda_alerta
+                        else:
+                            cell.border = borda_fina
 
-                        if col_name in ['BANCO', 'BANCO DA BAIXA']:
+                        if tem_alerta_temporal and col_name in ['DATA DO PAGAMENTO', 'DATA DA BAIXA', 'OBSERVAÇÃO']:
+                            cell.fill = fill_alerta
+                        elif col_name in ['BANCO', 'BANCO DA BAIXA']:
                             cell.fill = fill_verde_claro
                             cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
                         else:
@@ -969,7 +1003,7 @@ class ExcelReporter:
                     elif 'DATA' in col_name:
                         worksheet.column_dimensions[col_letter].width = max(max_length + 2, 23)
                     elif col_name == 'OBSERVAÇÃO':
-                        worksheet.column_dimensions[col_letter].width = 40
+                        worksheet.column_dimensions[col_letter].width = max(max_length + 2, 40)
                     else:
                         worksheet.column_dimensions[col_letter].width = min(max_length + 2, 50)
 

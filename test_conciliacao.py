@@ -1,599 +1,757 @@
 # -*- coding: utf-8 -*-
 """
-test_conciliacao.py - Suite de Testes Unitarios para o Sistema de Conciliacao Bancaria
+test_conciliacao.py - Suite de Testes Unitários para o Sistema de Conciliação Bancária
 ==========================================================================================
 
-Testa as tres regras de negocio do ReconciliationEngine com dados mockados
-extraidos das imagens reais do problema, alem de testar os componentes auxiliares
-DataCleaner, as funcoes de conversao e a expressao regular.
+Suite de testes atualizada para a API real e vigente do conciliacao.py.
+Cobre:
+    - parse_currency: função global de conversão e saneamento de valores monetários.
+    - DataCleaner: limpeza e mapeamento de planilhas do Argos e Extratos Bancários.
+    - ReconciliationEngine:
+        * Inicialização e segregação de estornos/saídas
+        * Estrutura de saída do execute_pipeline (5 abas padronizadas)
+        * Regra 1 / 1.1 / 0.5 / 3.5: Matches Perfeitos, Nome e Aproximação de Centavos
+        * Regra 2 / 2.5: Conciliação via Histórico (Regex) e Desmembramento Guiado
+        * Regra 3: Conciliação Desmembrada (Subset Sum multi-notas)
+        * Regra 4: Divergências Pendentes (Falta no Banco / Sobrou no Banco)
+        * Integridade e ausência de duplicações de registros
+    - ExcelReporter: geração física da planilha final .xlsx multi-abas formatada.
 
-Execucao:
+Execução:
     python -m unittest test_conciliacao.py -v
-    python -m unittest discover -v
-
-Estrutura de testes:
-    TestConversorValorBR       -> funcao _converter_valor_br
-    TestEncontraColuna         -> funcao _encontrar_coluna
-    TestRegexValorHistorico    -> constante REGEX_VALOR_HISTORICO
-    TestDataCleanerArgos       -> DataCleaner.clean_argos
-    TestDataCleanerBanco       -> DataCleaner.clean_bank
-    TestReconciliationEngine   -> ReconciliationEngine (todas as regras)
 """
 
+import os
+import tempfile
 import unittest
 import pandas as pd
-from datetime import datetime
+import openpyxl
 
 from conciliacao import (
+    parse_currency,
+    safe_float,
     DataCleaner,
     ReconciliationEngine,
     ExcelReporter,
-    _converter_valor_br,
-    _encontrar_coluna,
-    REGEX_VALOR_HISTORICO,
 )
 
 
-class TestConversorValorBR(unittest.TestCase):
-    """Testa a funcao auxiliar de conversao de valores monetarios brasileiros."""
+class TestParseCurrency(unittest.TestCase):
+    """Testa a função utilitária global parse_currency e safe_float."""
 
     def test_formato_br_com_milhar(self):
-        """Converte string com separador de milhar: 1.234,56 -> 1234.56."""
-        self.assertAlmostEqual(_converter_valor_br("1.234,56"), 1234.56, places=2)
+        """Converte string no formato brasileiro com separador de milhar."""
+        self.assertAlmostEqual(parse_currency("1.234,56"), 1234.56, places=2)
 
     def test_formato_br_simples(self):
-        """Converte string simples: 200,00 -> 200.0."""
-        self.assertAlmostEqual(_converter_valor_br("200,00"), 200.00, places=2)
+        """Converte string com vírgula decimal simples."""
+        self.assertAlmostEqual(parse_currency("200,00"), 200.00, places=2)
 
-    def test_formato_float_direto(self):
-        """Float passado diretamente retorna sem modificacao."""
-        self.assertAlmostEqual(_converter_valor_br(512.50), 512.50, places=2)
+    def test_formato_com_simbolo_rs(self):
+        """Remove o prefixo R$ e espaços antes da conversão."""
+        self.assertAlmostEqual(parse_currency("R$ 1.500,00"), 1500.00, places=2)
+        self.assertAlmostEqual(parse_currency("R$512,50"), 512.50, places=2)
 
-    def test_valor_inteiro(self):
-        """Inteiro eh convertido para float."""
-        self.assertAlmostEqual(_converter_valor_br(800), 800.00, places=2)
+    def test_tipo_numerico_direto(self):
+        """Float ou int passado diretamente retorna float sem erro."""
+        self.assertAlmostEqual(parse_currency(512.50), 512.50, places=2)
+        self.assertAlmostEqual(parse_currency(800), 800.00, places=2)
 
-    def test_valor_com_simbolo_rs(self):
-        """Remove o simbolo R$ antes da conversao."""
-        self.assertAlmostEqual(_converter_valor_br("R$ 1.500,00"), 1500.00, places=2)
+    def test_valores_nulos_e_invalidos(self):
+        """Entradas nulas, NaN ou strings não numéricas retornam None com segurança."""
+        self.assertIsNone(parse_currency(None))
+        self.assertIsNone(parse_currency(float("nan")))
+        self.assertIsNone(parse_currency(pd.NA))
+        self.assertIsNone(parse_currency("abc"))
+        self.assertIsNone(parse_currency(""))
+        self.assertIsNone(parse_currency("   "))
 
-    def test_valor_none_retorna_none(self):
-        """None como entrada retorna None."""
-        self.assertIsNone(_converter_valor_br(None))
+    def test_parametro_default_configuravel(self):
+        """Valida se o parâmetro default é retornado em vez de None."""
+        self.assertEqual(parse_currency(None, default=0.0), 0.0)
+        self.assertEqual(parse_currency("invalido", default=0.0), 0.0)
+        self.assertEqual(parse_currency("", default=-1.0), -1.0)
+        self.assertAlmostEqual(parse_currency("150,00", default=0.0), 150.0, places=2)
 
-    def test_valor_nan_retorna_none(self):
-        """NaN como entrada retorna None."""
-        self.assertIsNone(_converter_valor_br(float("nan")))
-
-    def test_string_invalida_retorna_none(self):
-        """String nao numerica retorna None sem lancar excecao."""
-        self.assertIsNone(_converter_valor_br("abc"))
-        self.assertIsNone(_converter_valor_br("N/A"))
-
-
-class TestEncontraColuna(unittest.TestCase):
-    """Testa a busca case-insensitive de colunas por lista de candidatos."""
-
-    def test_encontra_coluna_exata(self):
-        """Encontra coluna com nome exatamente igual ao candidato."""
-        resultado = _encontrar_coluna(["Data", "Valor", "Historico"], ["Data"])
-        self.assertEqual(resultado, "Data")
-
-    def test_encontra_coluna_case_insensitive(self):
-        """Encontra coluna mesmo com diferenca de caixa."""
-        resultado = _encontrar_coluna(["data", "valor"], ["DATA"])
-        self.assertEqual(resultado, "data")
-
-    def test_retorna_primeiro_candidato_disponivel(self):
-        """Retorna o primeiro candidato encontrado na lista."""
-        resultado = _encontrar_coluna(["Historico", "Credito"], ["X", "Credito", "Valor"])
-        self.assertEqual(resultado, "Credito")
-
-    def test_retorna_none_quando_nenhum_candidato_encontrado(self):
-        """Retorna None se nenhum candidato estiver presente no DataFrame."""
-        resultado = _encontrar_coluna(["Data", "Valor"], ["Credito", "VL CR"])
-        self.assertIsNone(resultado)
+    def test_safe_float_utilitario(self):
+        """Valida que safe_float converte valores válidos e faz fallback para 0.0 em inválidos."""
+        self.assertAlmostEqual(safe_float("1.250,50"), 1250.50, places=2)
+        self.assertAlmostEqual(safe_float("R$ 300,00"), 300.00, places=2)
+        self.assertEqual(safe_float(None), 0.0)
+        self.assertEqual(safe_float(float("nan")), 0.0)
+        self.assertEqual(safe_float("texto aleatorio"), 0.0)
+        self.assertEqual(safe_float(""), 0.0)
 
 
-class TestRegexValorHistorico(unittest.TestCase):
-    """Testa a expressao regular de extracao de valores do campo Historico."""
-
-    def test_captura_pix_no_valor_de(self):
-        """Captura valor precedido por "pix no valor de"."""
-        m = REGEX_VALOR_HISTORICO.search("pix no valor de 200,00 dia 22/06")
-        self.assertIsNotNone(m)
-        self.assertEqual(m.group(1), "200,00")
-
-    def test_captura_valor_de(self):
-        """Captura valor precedido por "valor de" com milhar."""
-        m = REGEX_VALOR_HISTORICO.search("comprovante no valor de 1.500,00")
-        self.assertIsNotNone(m)
-        self.assertEqual(m.group(1), "1.500,00")
-
-    def test_captura_pix_de(self):
-        """Captura valor precedido por "pix de"."""
-        m = REGEX_VALOR_HISTORICO.search("recebido pix de 512,50 confirmado")
-        self.assertIsNotNone(m)
-        self.assertEqual(m.group(1), "512,50")
-
-    def test_captura_valor_isolado_sem_prefixo(self):
-        """Captura valor no formato BR mesmo sem prefixo descritivo."""
-        m = REGEX_VALOR_HISTORICO.search("transferencia 354,04 ok")
-        self.assertIsNotNone(m)
-        self.assertEqual(m.group(1), "354,04")
-
-    def test_captura_case_insensitive(self):
-        """Regex funciona com MAIUSCULAS (case-insensitive)."""
-        m = REGEX_VALOR_HISTORICO.search("PIX NO VALOR DE 200,00 DIA 22/06")
-        self.assertIsNotNone(m)
-        self.assertEqual(m.group(1), "200,00")
-
-    def test_nao_captura_sem_decimal_br(self):
-        """Valor sem virgula decimal (ex: 800 reais) nao deve ser capturado.
-        Essa regra evita falsos positivos na Regra 3 (valores desmembrados).
-        """
-        m = REGEX_VALOR_HISTORICO.search("comprovante no valor de 800 reais")
-        self.assertIsNone(m, "Nao deveria capturar valor sem virgula decimal.")
-
-    def test_nao_captura_historico_vazio(self):
-        """Historico vazio retorna None sem lancar excecao."""
-        m = REGEX_VALOR_HISTORICO.search("")
-        self.assertIsNone(m)
-
-    def test_nao_captura_texto_sem_numero(self):
-        """Texto sem nenhum numero retorna None."""
-        m = REGEX_VALOR_HISTORICO.search("comprovante enviado sem valor informado")
-        self.assertIsNone(m)
-
-
-class TestDataCleanerArgos(unittest.TestCase):
-    """Testa a limpeza e normalizacao do DataFrame do Argos."""
-
-    def _criar_df_argos_bruto(self) -> pd.DataFrame:
-        """Cria DataFrame simulando a exportacao bruta do sistema Argos."""
-        return pd.DataFrame({
-            "Ordem": [1, 2],
-            "Conta": ["001", "002"],
-            "Evento": ["EV01", "EV02"],
-            "Tipo Evento": ["TE1", "TE2"],
-            "Parceiro Descricao": ["  junio silva  ", "  joao lima  "],
-            "Data": ["16/06/2026", "22/06/2026"],
-            "Valor": ["512,50", "199,17"],
-            "Evento Descricao": ["Inclusao Vendas", "Inclusao Vendas"],
-            "Historico": ["pix no valor de 512,50", "pix no valor de 200,00"],
-        })
-
-    def test_remove_colunas_desnecessarias(self):
-        """Remove as colunas de metadados internos do Argos."""
-        df_raw = self._criar_df_argos_bruto()
-        df_limpo = DataCleaner.clean_argos(df_raw)
-        for coluna in ["Ordem", "Conta", "Evento", "Tipo Evento"]:
-            self.assertNotIn(coluna, df_limpo.columns,
-                             f"Coluna de metadado '{coluna}' nao foi removida.")
-
-    def test_converte_data_formato_br(self):
-        """Converte a coluna Data de DD/MM/AAAA para datetime64.
-        Usa is_datetime64_any_dtype para ser agnóstico à resolucao (ns vs us),
-        garantindo compatibilidade com pandas 1.x e 2.x.
-        """
-        df_raw = self._criar_df_argos_bruto()
-        df_limpo = DataCleaner.clean_argos(df_raw)
-        self.assertTrue(
-            pd.api.types.is_datetime64_any_dtype(df_limpo["Data"]),
-            f"Coluna 'Data' deveria ser datetime64, mas e: {df_limpo['Data'].dtype}"
-        )
-        self.assertEqual(df_limpo["Data"].iloc[0], pd.Timestamp("2026-06-16"))
-
-    def test_converte_valor_para_float(self):
-        """Converte a coluna Valor de string BR para float64."""
-        df_raw = self._criar_df_argos_bruto()
-        df_limpo = DataCleaner.clean_argos(df_raw)
-        self.assertEqual(df_limpo["Valor"].dtype, "float64")
-        self.assertAlmostEqual(df_limpo["Valor"].iloc[0], 512.50, places=2)
-        self.assertAlmostEqual(df_limpo["Valor"].iloc[1], 199.17, places=2)
-
-    def test_normaliza_texto_para_uppercase_e_strip(self):
-        """Normaliza coluna de texto: remove espacos e converte para UPPER."""
-        df_raw = self._criar_df_argos_bruto()
-        df_limpo = DataCleaner.clean_argos(df_raw)
-        self.assertEqual(df_limpo["Parceiro Descricao"].iloc[0], "JUNIO SILVA")
-        self.assertEqual(df_limpo["Parceiro Descricao"].iloc[1], "JOAO LIMA")
-
-    def test_levanta_keyerror_coluna_obrigatoria_ausente(self):
-        """Lanca KeyError com mensagem em portugues se Valor estiver ausente."""
-        df_sem_valor = pd.DataFrame({
-            "Parceiro Descricao": ["teste"],
-            "Data": ["16/06/2026"],
-            "Historico": ["ok"],
-        })
-        with self.assertRaises(KeyError):
-            DataCleaner.clean_argos(df_sem_valor)
-
-    def test_remove_linhas_com_data_invalida(self):
-        """Linhas com data invalida sao removidas silenciosamente com aviso."""
-        df_com_data_invalida = pd.DataFrame({
-            "Parceiro Descricao": ["ok", "invalido"],
-            "Data": ["16/06/2026", "nao-e-data"],
-            "Valor": ["100,00", "200,00"],
-            "Historico": ["", ""],
-        })
-        df_limpo = DataCleaner.clean_argos(df_com_data_invalida)
-        self.assertEqual(len(df_limpo), 1)
-        self.assertEqual(df_limpo["Valor"].iloc[0], 100.00)
-
-
-class TestDataCleanerBanco(unittest.TestCase):
-    """Testa a normalizacao dos extratos bancarios."""
-
-    def _criar_df_banco_bruto(self) -> pd.DataFrame:
-        """Cria DataFrame simulando exportacao bruta de extrato bancario."""
-        return pd.DataFrame({
-            "Data": ["16/06/2026", "22/06/2026", "17/06/2026", "15/06/2026"],
-            "Credito": [512.50, 200.00, 800.00, -50.00],
-            "Historico": ["CREDITO PIX", "CREDITO PIX", "CREDITO PIX", "DEBITO TED"],
-        })
-
-    def test_filtra_apenas_creditos(self):
-        """Registros com valor negativo (debitos) sao descartados."""
-        df_raw = self._criar_df_banco_bruto()
-        df_limpo = DataCleaner.clean_bank(df_raw, bank_name="caixa")
-        self.assertTrue(
-            (df_limpo["valor_banco"] > 0).all(),
-            "Registros com valor <= 0 nao foram filtrados."
-        )
-        self.assertEqual(len(df_limpo), 3, "Deveriam restar exatamente 3 creditos.")
-
-    def test_renomeia_colunas_para_padrao_interno(self):
-        """Colunas do banco sao renomeadas para o padrao interno."""
-        df_raw = self._criar_df_banco_bruto()
-        df_limpo = DataCleaner.clean_bank(df_raw, bank_name="caixa")
-        for coluna_esperada in ["data_banco", "valor_banco", "descricao_banco"]:
-            self.assertIn(coluna_esperada, df_limpo.columns,
-                          f"Coluna '{coluna_esperada}' ausente no DataFrame normalizado.")
-
-    def test_converte_data_banco_para_datetime(self):
-        """Converte data_banco para datetime64.
-        Usa is_datetime64_any_dtype para ser agnóstico à resolucao (ns vs us),
-        garantindo compatibilidade com pandas 1.x e 2.x.
-        """
-        df_raw = self._criar_df_banco_bruto()
-        df_limpo = DataCleaner.clean_bank(df_raw, bank_name="caixa")
-        self.assertTrue(
-            pd.api.types.is_datetime64_any_dtype(df_limpo["data_banco"]),
-            f"Coluna 'data_banco' deveria ser datetime64, mas e: {df_limpo['data_banco'].dtype}"
-        )
-
-    def test_converte_valor_banco_para_float(self):
-        """Converte valor_banco para float64."""
-        df_raw = self._criar_df_banco_bruto()
-        df_limpo = DataCleaner.clean_bank(df_raw, bank_name="caixa")
-        self.assertEqual(df_limpo["valor_banco"].dtype, "float64")
-
-    def test_levanta_keyerror_coluna_nao_identificada(self):
-        """Lanca KeyError se coluna essencial nao puder ser identificada."""
-        df_colunas_erradas = pd.DataFrame({
-            "ColunaNaoExistente": ["2026-06-16"],
-            "OutraColunaNaoExistente": [100.0],
-            "MaisUmaColunaNaoExistente": ["PIX"],
-        })
-        with self.assertRaises(KeyError):
-            DataCleaner.clean_bank(df_colunas_erradas, bank_name="caixa")
-
-
-class TestReconciliationEngine(unittest.TestCase):
-    """
-    Suite principal de testes do motor de conciliacao.
-
-    Simula os dados exatos extraidos das imagens reais do problema, conforme
-    definido na especificacao tecnica funcional.
-
-    Cenarios representados no setUp:
-        - JUNIO SILVA:         Regra 1 - valor 512.50 bate exatamente em 16/06.
-        - JOAO LIMA JR:        Regra 2 - valor 199.17 no Argos, historico diz 200,00
-                               que bate com credito bancario de 200.00 em 22/06.
-        - LATICINIO SERTANEJO: Regra 3 - dois lancamentos (445.96 + 354.04)
-                               somados equivalem ao credito unico de 800.00 em 17/06.
-    """
+class TestDataCleaner(unittest.TestCase):
+    """Testa a limpeza de dados e detecção de arquivos do Argos e Bancos."""
 
     def setUp(self):
-        """Configuracao de dados mockados baseados nas imagens reais do problema."""
-        self.argos_base = pd.DataFrame({
-            "Parceiro Descricao": [
-                "JUNIO SILVA DE MENDOCA",
-                "JOAO DE OLIVEIRA LIMA JUNIOR",
-                "LATICINIO SERTANEJO",
-                "LATICINIO SERTANEJO",
-            ],
-            "Data": [
-                pd.to_datetime("2026-06-16"),
-                pd.to_datetime("2026-06-22"),
-                pd.to_datetime("2026-06-16"),
-                pd.to_datetime("2026-06-16"),
-            ],
-            "Valor": [512.50, 199.17, 445.96, 354.04],
-            "Evento Descricao": ["Inclusao Vendas Atacado"] * 4,
-            "Historico": [
-                "pix no valor de 512,50 dia 16/06",
-                "pix no valor de 200,00 dia 22/06",   # Caso de desvio - Regra 2
-                "16/06 comprovante no valor de 800 reais.",  # Desmembrado p1 - Regra 3
-                "16/06 comprovante no valor de 800 reais.",  # Desmembrado p2 - Regra 3
-            ],
+        self.temp_files = []
+
+    def tearDown(self):
+        for path in self.temp_files:
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+
+    def _criar_excel_temporario(self, df: pd.DataFrame, prefixo: str) -> str:
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", prefix=prefixo, delete=False) as tf:
+            caminho = tf.name
+        df.to_excel(caminho, index=False, engine="openpyxl")
+        self.temp_files.append(caminho)
+        return caminho
+
+    def test_clean_argos_mapeamento_e_formatacao(self):
+        """Verifica se clean_argos normaliza colunas, datas e valores corretamente."""
+        df_raw = pd.DataFrame({
+            "Parceiro Descricao": ["JUNIO SILVA", "JOAO LIMA"],
+            "Data": ["16/06/2026", "22/06/2026"],
+            "Valor": ["R$ 512,50", "199,17"],
+            "Evento Descricao": ["Vendas Atacado", "Vendas Varejo"],
+            "Historico": ["pix no valor de 512,50", "pix no valor de 200,00"],
+            "Banco": ["CAIXA", "CAIXA"],
         })
+        caminho = self._criar_excel_temporario(df_raw, "argos_teste_caixa_")
+        df_limpo = DataCleaner.clean_argos(caminho)
 
-        self.bank_base = pd.DataFrame({
-            "data_banco": [
-                pd.to_datetime("2026-06-16"),
-                pd.to_datetime("2026-06-22"),
-                pd.to_datetime("2026-06-17"),
-            ],
-            "valor_banco": [512.50, 200.00, 800.00],
-            "descricao_banco": ["CREDITO PIX", "CREDITO PIX", "CREDITO PIX"],
-        })
+        self.assertFalse(df_limpo.empty)
+        for col_esperada in ["Banco", "Cliente", "Valor", "Data", "Histórico", "Tipo Evento"]:
+            self.assertIn(col_esperada, df_limpo.columns)
 
-    # -----------------------------------------------------------------------
-    # Testes da Regra 1: Match Exato
-    # -----------------------------------------------------------------------
+        self.assertAlmostEqual(df_limpo["Valor"].iloc[0], 512.50, places=2)
+        self.assertAlmostEqual(df_limpo["Valor"].iloc[1], 199.17, places=2)
+        self.assertEqual(df_limpo["Cliente"].iloc[0], "JUNIO SILVA")
+        self.assertEqual(df_limpo["Data"].iloc[0], "16/06/2026")
 
-    def test_regra_1_match_perfeito(self):
-        """Testa se o valor de 512.50 e conciliado perfeitamente na mesma data."""
-        engine = ReconciliationEngine(self.argos_base, self.bank_base)
-        res = engine.match_exact()
-        self.assertIn("Conciliado_Perfeito", res)
-        self.assertFalse(
-            res["Conciliado_Perfeito"].empty,
-            "A aba Conciliado_Perfeito nao deve estar vazia."
-        )
-        self.assertTrue(
-            any(res["Conciliado_Perfeito"]["Valor"] == 512.50),
-            "O registro de 512.50 nao foi encontrado em Conciliado_Perfeito."
-        )
-
-    def test_regra_1_nao_concilia_fora_da_janela_temporal(self):
-        """Credito bancario com +4 dias nao deve ser conciliado pela Regra 1.
-        A janela e 0 a +3 dias, portanto +4 dias deve permanecer como divergencia.
-        """
-        argos_teste = pd.DataFrame({
-            "Parceiro Descricao": ["TESTE"],
-            "Data": [pd.to_datetime("2026-06-10")],
-            "Valor": [100.00],
+    def test_clean_argos_data_sem_ano_usa_ano_atual(self):
+        """Verifica se datas no formato DD/MM (sem ano) recebem o ano corrente dinamicamente."""
+        from datetime import datetime
+        ano_atual = datetime.now().year
+        
+        df_raw = pd.DataFrame({
+            "Parceiro Descricao": ["TESTE ANO"],
+            "Data": ["16/06"], # sem ano
+            "Valor": ["R$ 100,00"],
+            "Evento Descricao": ["Venda"],
             "Historico": [""],
+            "Banco": ["CAIXA"],
         })
-        banco_teste = pd.DataFrame({
-            "data_banco": [pd.to_datetime("2026-06-14")],  # +4 dias -> fora da janela
-            "valor_banco": [100.00],
-            "descricao_banco": ["PIX"],
+        caminho = self._criar_excel_temporario(df_raw, "argos_teste_ano_")
+        df_limpo = DataCleaner.clean_argos(caminho)
+
+        self.assertFalse(df_limpo.empty)
+        # Esperado que a data seja 16/06/ANO_ATUAL
+        data_esperada = f"16/06/{ano_atual}"
+        self.assertEqual(df_limpo["Data"].iloc[0], data_esperada)
+
+    def test_clean_argos_sem_coluna_valor_retorna_vazio(self):
+        """Arquivo do Argos sem nenhuma coluna identificável como Valor retorna DataFrame vazio."""
+        df_sem_valor = pd.DataFrame({
+            "Cliente": ["Teste"],
+            "Data": ["16/06/2026"],
+            "Observacoes": ["Sem valor"],
         })
-        engine = ReconciliationEngine(argos_teste, banco_teste)
-        res = engine.match_exact()
-        self.assertTrue(
-            res["Conciliado_Perfeito"].empty,
-            "Credito com +4 dias nao deveria ser conciliado pela Regra 1."
-        )
+        caminho = self._criar_excel_temporario(df_sem_valor, "argos_invalido_")
+        df_limpo = DataCleaner.clean_argos(caminho)
+        self.assertTrue(df_limpo.empty)
 
-    def test_regra_1_concilia_dentro_da_janela_mais_3_dias(self):
-        """Credito bancario com exatamente +3 dias deve ser conciliado pela Regra 1."""
-        argos_teste = pd.DataFrame({
-            "Parceiro Descricao": ["TESTE"],
-            "Data": [pd.to_datetime("2026-06-16")],
-            "Valor": [100.00],
-            "Historico": [""],
+    def test_clean_argos_deteccao_banco_pelo_conteudo_ou_arquivo(self):
+        """Detecta o nome do banco analisando o conteúdo (cabeçalhos) com fallback para o nome."""
+        df_raw_caixa = pd.DataFrame({
+            "Cliente": ["Cliente A"],
+            "Valor": [100.0],
+            "Data": ["16/06/2026"],
+            "Histórico": ["Extrato da Caixa Economica Federal"],
         })
-        banco_teste = pd.DataFrame({
-            "data_banco": [pd.to_datetime("2026-06-19")],  # exatamente +3 dias
-            "valor_banco": [100.00],
-            "descricao_banco": ["PIX"],
+        caminho_caixa = self._criar_excel_temporario(df_raw_caixa, "extrato_generico_1_")
+        df_caixa = DataCleaner.clean_argos(caminho_caixa)
+        self.assertEqual(df_caixa["Banco"].iloc[0], "CAIXA ECONOMICA")
+
+        df_raw_banese = pd.DataFrame({
+            "Cliente": ["Cliente B"],
+            "Valor": [200.0],
+            "Data": ["16/06/2026"],
+            "Histórico": ["Extrato do BANESE S.A."],
         })
-        engine = ReconciliationEngine(argos_teste, banco_teste)
-        res = engine.match_exact()
-        self.assertFalse(
-            res["Conciliado_Perfeito"].empty,
-            "Credito com +3 dias deveria ser conciliado pela Regra 1."
-        )
+        caminho_banese = self._criar_excel_temporario(df_raw_banese, "extrato_generico_2_")
+        df_banese = DataCleaner.clean_argos(caminho_banese)
+        self.assertEqual(df_banese["Banco"].iloc[0], "BANESE")
 
-    # -----------------------------------------------------------------------
-    # Testes da Regra 2: Regex Historico
-    # -----------------------------------------------------------------------
-
-    def test_regra_2_ajuste_historico(self):
-        """Testa se a baixa de 199.17 encontra o credito de 200.00 lendo o historico."""
-        engine = ReconciliationEngine(self.argos_base, self.bank_base)
-        res = engine.match_by_history_regex()
-        self.assertIn("Conciliado_Via_Historico", res)
-        self.assertFalse(
-            res["Conciliado_Via_Historico"].empty,
-            "A aba Conciliado_Via_Historico nao deve estar vazia."
-        )
-        self.assertTrue(
-            any(res["Conciliado_Via_Historico"]["valor_real_banco"] == 200.00),
-            "O valor real de 200.00 nao foi encontrado em Conciliado_Via_Historico."
-        )
-
-    def test_regra_2_nao_concilia_quando_historico_sem_valor_br(self):
-        """Historico sem valor monetario BR nao deve gerar match via Regra 2.
-        Garante que textos descritivos sem numero formatado nao causam falsos positivos.
-        """
-        argos_sem_regex = pd.DataFrame({
-            "Parceiro Descricao": ["TESTE"],
-            "Data": [pd.to_datetime("2026-06-22")],
-            "Valor": [199.17],
-            "Historico": ["COMPROVANTE ENVIADO SEM VALOR ESPECIFICADO"],
+    def test_clean_bank_filtra_debitos_e_normaliza(self):
+        """clean_bank descarta valores menores ou iguais a zero (débitos) e padroniza colunas."""
+        df_raw = pd.DataFrame({
+            "Data": ["16/06/2026", "17/06/2026", "18/06/2026"],
+            "Valor": ["512,50", "-50,00", "0,00"],
+            "Histórico": ["CREDITO PIX", "DEBITO TARIFA", "SALDO"],
+            "Tipo": ["C", "D", "C"],
         })
-        banco_teste = pd.DataFrame({
-            "data_banco": [pd.to_datetime("2026-06-22")],
-            "valor_banco": [200.00],
-            "descricao_banco": ["PIX"],
+        caminho = self._criar_excel_temporario(df_raw, "banco_caixa_")
+        df_limpo = DataCleaner.clean_bank(caminho)
+
+        self.assertEqual(len(df_limpo), 1)
+        self.assertAlmostEqual(df_limpo["Valor"].iloc[0], 512.50, places=2)
+        self.assertEqual(df_limpo["Banco"].iloc[0], "CAIXA ECONOMICA")
+
+
+class TestReconciliationEngineSetup(unittest.TestCase):
+    """Testa a inicialização do motor e a segregação de estornos e saídas."""
+
+    def test_segrega_estornos_do_argos(self):
+        """Registros com valor negativo ou contendo 'estorno' no Tipo Evento são segregados."""
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA", "CAIXA"],
+            "Cliente": ["Cliente Normal", "Cliente Estorno"],
+            "Valor": [500.0, -150.0],
+            "Data": ["16/06/2026", "16/06/2026"],
+            "Histórico": ["Venda", "Devolução"],
+            "Tipo Evento": ["Venda", "Estorno de Cupom"],
         })
-        engine = ReconciliationEngine(argos_sem_regex, banco_teste)
-        res = engine.match_by_history_regex()
-        self.assertTrue(
-            res["Conciliado_Via_Historico"].empty,
-            "Nao deveria conciliar quando historico nao tem valor monetario BR."
-        )
-
-    def test_regra_2_nao_concilia_fora_da_janela_negativa(self):
-        """Credito bancario com -3 dias nao deve ser conciliado (janela e -2 a +3)."""
-        argos_teste = pd.DataFrame({
-            "Parceiro Descricao": ["TESTE"],
-            "Data": [pd.to_datetime("2026-06-22")],
-            "Valor": [199.17],
-            "Historico": ["pix no valor de 200,00"],
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["CREDITO"],
+            "Valor": [500.0],
+            "Data": ["16/06/2026"],
+            "Tipo": ["C"],
         })
-        banco_teste = pd.DataFrame({
-            "data_banco": [pd.to_datetime("2026-06-19")],  # -3 dias -> fora da janela
-            "valor_banco": [200.00],
-            "descricao_banco": ["PIX"],
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+
+        # O registro de estorno deve sair da base ativa do Argos
+        self.assertEqual(len(engine.df_argos), 1)
+        self.assertEqual(engine.df_argos["Cliente"].iloc[0], "Cliente Normal")
+
+        # E deve estar registrado em df_saidas_estornos
+        self.assertEqual(len(engine.df_saidas_estornos), 1)
+        self.assertEqual(engine.df_saidas_estornos["Motivo Divergência"].iloc[0], "Estorno (Argos)")
+        self.assertAlmostEqual(engine.df_saidas_estornos["Valor"].iloc[0], 150.0, places=2)
+
+    def test_segrega_saidas_do_banco(self):
+        """Registros com valor negativo ou Tipo 'D' no extrato bancário vão para Saídas/Estornos."""
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Cliente": ["Cliente Normal"],
+            "Valor": [500.0],
+            "Data": ["16/06/2026"],
+            "Histórico": ["Venda"],
+            "Tipo Evento": ["Venda"],
         })
-        engine = ReconciliationEngine(argos_teste, banco_teste)
-        res = engine.match_by_history_regex()
-        self.assertTrue(
-            res["Conciliado_Via_Historico"].empty,
-            "Credito com -3 dias nao deveria ser conciliado pela Regra 2."
-        )
-
-    def test_regra_2_documenta_valor_original_e_real(self):
-        """Resultado da Regra 2 deve conter as colunas de rastreabilidade."""
-        engine = ReconciliationEngine(self.argos_base, self.bank_base)
-        res = engine.match_by_history_regex()
-        df = res["Conciliado_Via_Historico"]
-        if not df.empty:
-            self.assertIn("valor_original_argos", df.columns)
-            self.assertIn("valor_real_banco", df.columns)
-            self.assertIn("historico_regex_extraido", df.columns)
-
-    # -----------------------------------------------------------------------
-    # Testes da Regra 3: Subset Sum (Desmembrados)
-    # -----------------------------------------------------------------------
-
-    def test_regra_3_valores_desmembrados(self):
-        """Testa se as duas baixas (445.96 e 354.04) combinam com o credito de 800.00."""
-        engine = ReconciliationEngine(self.argos_base, self.bank_base)
-        res = engine.match_split_sums()
-        self.assertIn("Conciliado_Desmembrado", res)
-        self.assertEqual(
-            len(res["Conciliado_Desmembrado"]), 2,
-            "Esperadas 2 linhas do Argos (as partes desmembradas) em Conciliado_Desmembrado."
-        )
-
-    def test_regra_3_soma_das_partes_correta(self):
-        """A soma das partes desmembradas deve ser igual ao valor bancario."""
-        engine = ReconciliationEngine(self.argos_base, self.bank_base)
-        res = engine.match_split_sums()
-        df = res["Conciliado_Desmembrado"]
-        if not df.empty:
-            soma = round(df["Valor"].sum(), 2)
-            self.assertAlmostEqual(
-                soma, 800.00, places=2,
-                msg=f"A soma das partes ({soma}) nao equivale a 800.00."
-            )
-
-    def test_regra_3_nao_combina_alem_de_3_elementos(self):
-        """Garante que combinacoes de 4+ elementos nao sao testadas.
-        Isso protege contra explosao combinatoria (controle de performance).
-        O limite MAX_COMBINACOES = 3 deve impedir o match quando a solucao
-        exige 4 partes.
-        """
-        argos_4_partes = pd.DataFrame({
-            "Parceiro Descricao": ["A", "B", "C", "D"],
-            "Data": [pd.to_datetime("2026-06-16")] * 4,
-            "Valor": [100.00, 200.00, 300.00, 400.00],
-            "Historico": [""] * 4,
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA", "CAIXA"],
+            "Histórico": ["CREDITO PIX", "TARIFA BANCARIA"],
+            "Valor": [500.0, -25.0],
+            "Data": ["16/06/2026", "16/06/2026"],
+            "Tipo": ["C", "D"],
         })
-        banco_4 = pd.DataFrame({
-            "data_banco": [pd.to_datetime("2026-06-16")],
-            "valor_banco": [1000.00],  # So encontrado com 4 partes
-            "descricao_banco": ["PIX"],
-        })
-        engine = ReconciliationEngine(argos_4_partes, banco_4)
-        res = engine.match_split_sums()
-        self.assertTrue(
-            res["Conciliado_Desmembrado"].empty,
-            "O motor nao deve testar combinacoes de 4 elementos (limite MAX_COMBINACOES=3)."
-        )
 
-    def test_regra_3_nao_combina_fora_da_janela_temporal(self):
-        """Baixas fora da janela de +-3 dias do credito bancario nao sao combinadas."""
-        argos_fora_janela = pd.DataFrame({
-            "Parceiro Descricao": ["A", "B"],
-            "Data": [pd.to_datetime("2026-06-01"), pd.to_datetime("2026-06-02")],
-            "Valor": [445.96, 354.04],
-            "Historico": ["", ""],
-        })
-        banco_17 = pd.DataFrame({
-            "data_banco": [pd.to_datetime("2026-06-17")],  # 15+ dias depois
-            "valor_banco": [800.00],
-            "descricao_banco": ["PIX"],
-        })
-        engine = ReconciliationEngine(argos_fora_janela, banco_17)
-        res = engine.match_split_sums()
-        self.assertTrue(
-            res["Conciliado_Desmembrado"].empty,
-            "Baixas muito antigas nao devem ser combinadas com credito recente."
-        )
+        engine = ReconciliationEngine(df_argos, df_bank)
 
-    # -----------------------------------------------------------------------
-    # Testes do Pipeline Completo
-    # -----------------------------------------------------------------------
+        # A saída deve sair da base ativa do Banco
+        self.assertEqual(len(engine.df_bank), 1)
+        self.assertEqual(engine.df_bank["Histórico"].iloc[0], "CREDITO PIX")
 
-    def test_pipeline_completo_retorna_quatro_abas(self):
-        """Testa se execute_pipeline retorna o dicionario com as 4 abas esperadas."""
-        engine = ReconciliationEngine(self.argos_base, self.bank_base)
-        resultado = engine.execute_pipeline()
-        abas_esperadas = {
-            "Conciliado_Perfeito",
-            "Conciliado_Via_Historico",
-            "Conciliado_Desmembrado",
-            "Divergencias_Pendentes",
+        # E deve estar em df_saidas_estornos
+        self.assertEqual(len(engine.df_saidas_estornos), 1)
+        self.assertEqual(engine.df_saidas_estornos["Motivo Divergência"].iloc[0], "Saída (Banco)")
+
+
+class TestReconciliationEnginePipeline(unittest.TestCase):
+    """Testa o contrato do pipeline completo de conciliação."""
+
+    def setUp(self):
+        self.colunas_obrigatorias = [
+            "Banco", "Cliente", "Valor", "Data",
+            "Baixas", "Data Baixa", "Histórico", "Motivo Divergência"
+        ]
+        self.chaves_obrigatorias = {
+            "1_Conciliado_Perfeito",
+            "2_Conciliado_Via_Historico",
+            "3_Conciliado_Desmembrado",
+            "4_Saidas_Estornos",
+            "5_Divergencias_Pendentes",
         }
-        self.assertEqual(set(resultado.keys()), abas_esperadas)
 
-    def test_pipeline_nao_duplica_registros(self):
-        """Nenhum registro Argos pode ser conciliado mais de uma vez no pipeline.
-        O total de registros conciliados nao pode exceder o tamanho do Argos.
-        """
-        engine = ReconciliationEngine(self.argos_base, self.bank_base)
-        resultado = engine.execute_pipeline()
-        total_conciliados = 0
-        for chave in ["Conciliado_Perfeito", "Conciliado_Via_Historico", "Conciliado_Desmembrado"]:
-            df = resultado[chave]
-            if not df.empty and "Valor" in df.columns:
-                total_conciliados += len(df)
-        self.assertLessEqual(
-            total_conciliados, len(self.argos_base),
-            "Pipeline conciliou mais registros que o total do Argos (duplicacao detectada)."
-        )
+    def test_pipeline_retorna_todas_as_cinco_abas_padronizadas(self):
+        """execute_pipeline deve retornar exatamente as 5 abas padronizadas com colunas corretas."""
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Cliente": ["CLIENTE A"],
+            "Valor": [100.0],
+            "Data": ["16/06/2026"],
+            "Histórico": [""],
+            "Tipo Evento": ["Venda"],
+        })
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["CREDITO"],
+            "Valor": [100.0],
+            "Data": ["16/06/2026"],
+            "Tipo": ["C"],
+        })
 
-    def test_pipeline_todos_valores_sao_dataframes(self):
-        """Todas as 4 chaves do resultado devem conter DataFrames validos."""
-        engine = ReconciliationEngine(self.argos_base, self.bank_base)
+        engine = ReconciliationEngine(df_argos, df_bank)
         resultado = engine.execute_pipeline()
+
+        self.assertEqual(set(resultado.keys()), self.chaves_obrigatorias)
         for chave, df in resultado.items():
-            self.assertIsInstance(
-                df, pd.DataFrame,
-                f"A chave '{chave}' nao contem um DataFrame valido."
-            )
+            self.assertIsInstance(df, pd.DataFrame, f"A chave '{chave}' deve conter um DataFrame.")
+            self.assertEqual(list(df.columns), self.colunas_obrigatorias)
 
-    def test_pipeline_sem_dados_nao_levanta_excecao(self):
-        """Pipeline com DataFrames vazios nao deve lancar excecao.
-        Garante robustez para casos onde nao ha registros a conciliar.
-        """
-        df_vazio_argos = pd.DataFrame({
-            "Parceiro Descricao": pd.Series([], dtype="str"),
-            "Data": pd.Series([], dtype="datetime64[ns]"),
-            "Valor": pd.Series([], dtype="float64"),
-            "Historico": pd.Series([], dtype="str"),
+    def test_pipeline_com_entradas_vazias_nao_lanca_excecao(self):
+        """Pipeline executado com DataFrames vazios deve retornar as 5 abas vazias sem exceção."""
+        engine = ReconciliationEngine(pd.DataFrame(), pd.DataFrame())
+        resultado = engine.execute_pipeline()
+
+        self.assertEqual(set(resultado.keys()), self.chaves_obrigatorias)
+        for chave, df in resultado.items():
+            self.assertTrue(df.empty)
+            self.assertEqual(set(df.columns), set(self.colunas_obrigatorias))
+
+
+class TestRegrasConciliacao(unittest.TestCase):
+    """Testa individualmente as regras de negócio integradas no pipeline de conciliação."""
+
+    def test_regra_1_match_perfeito_unico(self):
+        """Mesmo valor e data no Argos e Banco conciliam em 1_Conciliado_Perfeito."""
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Cliente": ["JUNIO SILVA"],
+            "Valor": [512.50],
+            "Data": ["16/06/2026"],
+            "Histórico": ["Venda normal atacado"],
+            "Tipo Evento": ["Venda"],
         })
-        df_vazio_banco = pd.DataFrame({
-            "data_banco": pd.Series([], dtype="datetime64[ns]"),
-            "valor_banco": pd.Series([], dtype="float64"),
-            "descricao_banco": pd.Series([], dtype="str"),
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["CREDITO PIX JUNIO"],
+            "Valor": [512.50],
+            "Data": ["16/06/2026"],
+            "Tipo": ["C"],
         })
-        try:
-            engine = ReconciliationEngine(df_vazio_argos, df_vazio_banco)
-            resultado = engine.execute_pipeline()
-            for df in resultado.values():
-                self.assertIsInstance(df, pd.DataFrame)
-        except Exception as exc:
-            self.fail(f"Pipeline levantou excecao inesperada com DataFrames vazios: {exc}")
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        res = engine.execute_pipeline()
+
+        df_perfeito = res["1_Conciliado_Perfeito"]
+        self.assertEqual(len(df_perfeito), 1)
+        self.assertAlmostEqual(df_perfeito["Valor"].iloc[0], 512.50, places=2)
+        self.assertEqual(df_perfeito["Baixas"].iloc[0], "CAIXA")
+        self.assertEqual(df_perfeito["Data Baixa"].iloc[0], "16/06/2026")
+        self.assertTrue(res["5_Divergencias_Pendentes"].empty)
+
+    def test_regra_0_5_match_por_nome(self):
+        """Quando a descrição do extrato bancário contém o nome do cliente, concilia na Regra 0.5."""
+        # Colocamos um segundo registro com mesmo valor para haver concorrência que exigiria o nome
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Cliente": ["MARIA FERREIRA SOUZA"],
+            "Valor": [350.00],
+            "Data": ["10/06/2026"],
+            "Histórico": ["Venda balcão"],
+            "Tipo Evento": ["Venda"],
+        })
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["TRANSFERENCIA PIX MARIA FERREIRA"],
+            "Valor": [350.00],
+            "Data": ["11/06/2026"],
+            "Tipo": ["C"],
+        })
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        res = engine.execute_pipeline()
+
+        df_perfeito = res["1_Conciliado_Perfeito"]
+        self.assertEqual(len(df_perfeito), 1)
+        self.assertEqual(df_perfeito["Cliente"].iloc[0], "MARIA FERREIRA SOUZA")
+        self.assertEqual(df_perfeito["Baixas"].iloc[0], "CAIXA")
+        self.assertEqual(df_perfeito["Data Baixa"].iloc[0], "11/06/2026")
+
+    def test_regra_3_5_aproximacao_de_centavos(self):
+        """Diferenças de até R$ 1.50 com datas próximas (até 3 dias) são conciliadas com observação."""
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Cliente": ["POSTO CENTRAL"],
+            "Valor": [500.00],
+            "Data": ["15/06/2026"],
+            "Histórico": [""],
+            "Tipo Evento": ["Venda"],
+        })
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["CREDITO PIX"],
+            "Valor": [500.80],  # Diferença de 80 centavos
+            "Data": ["16/06/2026"],
+            "Tipo": ["C"],
+        })
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        res = engine.execute_pipeline()
+
+        df_perfeito = res["1_Conciliado_Perfeito"]
+        self.assertEqual(len(df_perfeito), 1)
+        self.assertIn("Aproximação de Centavos", str(df_perfeito["Motivo Divergência"].iloc[0]))
+
+    def test_regra_2_conciliado_via_historico_regex(self):
+        """Valor nominal no Argos de 199.17 com histórico citando 200,00 concilia com crédito bancário de 200.00."""
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Cliente": ["JOAO DE OLIVEIRA LIMA JUNIOR"],
+            "Valor": [199.17],
+            "Data": ["22/06/2026"],
+            "Histórico": ["pix no valor de 200,00 dia 22/06"],
+            "Tipo Evento": ["Venda"],
+        })
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["CREDITO PIX"],
+            "Valor": [200.00],
+            "Data": ["22/06/2026"],
+            "Tipo": ["C"],
+        })
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        res = engine.execute_pipeline()
+
+        df_hist = res["2_Conciliado_Via_Historico"]
+        self.assertEqual(len(df_hist), 1)
+        self.assertAlmostEqual(df_hist["Valor"].iloc[0], 199.17, places=2)
+        self.assertEqual(df_hist["Data Baixa"].iloc[0], "22/06/2026")
+        self.assertEqual(df_hist["Baixas"].iloc[0], "CAIXA")
+        self.assertTrue(res["5_Divergencias_Pendentes"].empty)
+
+    def test_regra_3_conciliado_desmembrado_subset_sum(self):
+        """Múltiplas baixas do Argos do mesmo cliente (445.96 + 354.04) somando 800.00 conciliam com crédito de 800.00."""
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA", "CAIXA"],
+            "Cliente": ["LATICINIO SERTANEJO", "LATICINIO SERTANEJO"],
+            "Valor": [445.96, 354.04],
+            "Data": ["16/06/2026", "16/06/2026"],
+            "Histórico": ["comprovante de 800 reais", "comprovante de 800 reais"],
+            "Tipo Evento": ["Venda", "Venda"],
+        })
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["CREDITO PIX"],
+            "Valor": [800.00],
+            "Data": ["17/06/2026"],
+            "Tipo": ["C"],
+        })
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        res = engine.execute_pipeline()
+
+        df_desm = res["3_Conciliado_Desmembrado"]
+        self.assertEqual(len(df_desm), 2)
+        soma_partes = round(df_desm["Valor"].sum(), 2)
+        self.assertAlmostEqual(soma_partes, 800.00, places=2)
+        self.assertTrue(res["5_Divergencias_Pendentes"].empty)
+
+    def test_regra_4_divergencias_pendentes_identificadas(self):
+        """Registros sem par são direcionados para 5_Divergencias_Pendentes com os motivos respectivos."""
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Cliente": ["CLIENTE SEM BANCO"],
+            "Valor": [999.00],
+            "Data": ["01/06/2026"],
+            "Histórico": [""],
+            "Tipo Evento": ["Venda"],
+        })
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["CREDITO NAO RECONHECIDO"],
+            "Valor": [777.00],
+            "Data": ["01/06/2026"],
+            "Tipo": ["C"],
+        })
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        res = engine.execute_pipeline()
+
+        df_div = res["5_Divergencias_Pendentes"]
+        self.assertEqual(len(df_div), 2)
+
+        motivos = df_div["Motivo Divergência"].tolist()
+        self.assertIn("Falta no Banco", motivos)
+        self.assertTrue(any("Sobrou no Banco" in m for m in motivos))
+
+
+class TestIntegridadeEAntiDuplicidade(unittest.TestCase):
+    """Testa integridade financeira e garantia de que nenhum registro é duplicado ou perdido."""
+
+    def test_nenhum_registro_argos_duplicado(self):
+        """A soma dos registros conciliados e divergentes deve ser exatamente igual ao total de registros válidos do Argos."""
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA", "CAIXA", "CAIXA"],
+            "Cliente": ["Cliente 1", "Cliente 2", "Cliente 3"],
+            "Valor": [100.00, 200.00, 300.00],
+            "Data": ["16/06/2026", "16/06/2026", "16/06/2026"],
+            "Histórico": ["", "pix no valor de 210,00", ""],
+            "Tipo Evento": ["Venda", "Venda", "Venda"],
+        })
+        # Banco tem apenas o par do Cliente 1
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["PIX CLIENTE 1"],
+            "Valor": [100.00],
+            "Data": ["16/06/2026"],
+            "Tipo": ["C"],
+        })
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        res = engine.execute_pipeline()
+
+        # Cliente 1 deve estar no Perfeito
+        self.assertEqual(len(res["1_Conciliado_Perfeito"]), 1)
+        # Clientes 2 e 3 devem sobrar no Argos (Falta no Banco)
+        div_argos = res["5_Divergencias_Pendentes"][res["5_Divergencias_Pendentes"]["Motivo Divergência"] == "Falta no Banco"]
+        self.assertEqual(len(div_argos), 2)
+
+        # Total de registros originados do Argos no resultado
+        total_argos_no_resultado = (
+            len(res["1_Conciliado_Perfeito"]) +
+            len(res["2_Conciliado_Via_Historico"]) +
+            len(res["3_Conciliado_Desmembrado"]) +
+            len(div_argos)
+        )
+        self.assertEqual(total_argos_no_resultado, len(df_argos))
+
+    def test_credito_bancario_nao_e_reutilizado(self):
+        """Um crédito bancário de valor V concilia com apenas 1 registro do Argos de mesmo valor V."""
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA", "CAIXA"],
+            "Cliente": ["Cliente A", "Cliente B"],
+            "Valor": [150.00, 150.00],
+            "Data": ["16/06/2026", "16/06/2026"],
+            "Histórico": ["", ""],
+            "Tipo Evento": ["Venda", "Venda"],
+        })
+        # Apenas 1 crédito de 150.00 no banco
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["PIX"],
+            "Valor": [150.00],
+            "Data": ["16/06/2026"],
+            "Tipo": ["C"],
+        })
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        res = engine.execute_pipeline()
+
+        # Exatamente 1 deve ser conciliado
+        self.assertEqual(len(res["1_Conciliado_Perfeito"]), 1)
+        # O outro deve sobrar como divergência
+        div_argos = res["5_Divergencias_Pendentes"][res["5_Divergencias_Pendentes"]["Motivo Divergência"] == "Falta no Banco"]
+        self.assertEqual(len(div_argos), 1)
+
+
+class TestExcelReporter(unittest.TestCase):
+    """Testa a geração de relatório Excel multi-abas."""
+
+    def setUp(self):
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", prefix="relatorio_teste_", delete=False) as tf:
+            self.output_path = tf.name
+
+    def tearDown(self):
+        if os.path.exists(self.output_path):
+            try:
+                os.remove(self.output_path)
+            except OSError:
+                pass
+
+    def test_generate_report_cria_arquivo_valido_com_todas_as_abas(self):
+        """ExcelReporter.generate_report cria arquivo .xlsx que pode ser lido pelo openpyxl."""
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Cliente": ["CLIENTE A"],
+            "Valor": [100.00],
+            "Data": ["16/06/2026"],
+            "Histórico": ["TESTE"],
+            "Tipo Evento": ["Venda"],
+        })
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["CREDITO"],
+            "Valor": [100.00],
+            "Data": ["16/06/2026"],
+            "Tipo": ["C"],
+        })
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        resultados = engine.execute_pipeline()
+
+        ExcelReporter.generate_report(resultados, self.output_path)
+
+        self.assertTrue(os.path.exists(self.output_path))
+        self.assertGreater(os.path.getsize(self.output_path), 0)
+
+        # Abre com openpyxl para certificar integridade
+        wb = openpyxl.load_workbook(self.output_path)
+        nomes_abas = wb.sheetnames
+
+        # Nomes esperados após substituição de underscore por espaço:
+        for chave in resultados.keys():
+            nome_esperado = chave.replace("_", " ")
+            self.assertIn(nome_esperado, nomes_abas)
+
+    def test_generate_report_aplica_alerta_visual_quando_diferenca_maior_que_limite(self):
+        """Diferença > 5 dias entre Data do Pagamento e Data da Baixa gera texto e formatação de alerta visual no Excel."""
+        resultados = {
+            "1_Conciliado_Perfeito": pd.DataFrame([{
+                "Banco": "CAIXA",
+                "Cliente": "CLIENTE DISTANTE",
+                "Valor": 500.00,
+                "Data": "01/06/2026",
+                "Baixas": "CAIXA",
+                "Data Baixa": "20/06/2026", # 19 dias de diferença (> 5)
+                "Histórico": "CRED PIX",
+                "Motivo Divergência": "",
+            }]),
+            "2_Conciliado_Via_Historico": pd.DataFrame(),
+            "3_Conciliado_Desmembrado": pd.DataFrame(),
+            "4_Saidas_Estornos": pd.DataFrame(),
+            "5_Divergencias_Pendentes": pd.DataFrame(),
+        }
+
+        ExcelReporter.generate_report(resultados, self.output_path, dias_alerta_temporal=5)
+
+        wb = openpyxl.load_workbook(self.output_path)
+        ws = wb["1 Conciliado Perfeito"]
+
+        # Identifica colunas pelo cabeçalho
+        colunas = {str(ws.cell(row=1, column=c).value).upper(): c for c in range(1, ws.max_column + 1)}
+        self.assertIn("OBSERVAÇÃO", colunas)
+        self.assertIn("DATA DO PAGAMENTO", colunas)
+        self.assertIn("DATA DA BAIXA", colunas)
+
+        col_obs = colunas["OBSERVAÇÃO"]
+        col_pgto = colunas["DATA DO PAGAMENTO"]
+        col_baixa = colunas["DATA DA BAIXA"]
+
+        cell_obs = ws.cell(row=2, column=col_obs)
+        cell_pgto = ws.cell(row=2, column=col_pgto)
+        cell_baixa = ws.cell(row=2, column=col_baixa)
+
+        # 1. Verifica texto na coluna OBSERVAÇÃO
+        self.assertIn("Alerta Temporal: Diferença de 19 dias", str(cell_obs.value))
+
+        # 2. Verifica cores de preenchimento (FFF2CC)
+        cor_obs = str(cell_obs.fill.start_color.rgb).upper()
+        cor_pgto = str(cell_pgto.fill.start_color.rgb).upper()
+        cor_baixa = str(cell_baixa.fill.start_color.rgb).upper()
+
+        self.assertTrue(cor_obs.endswith("FFF2CC"), f"Cor inesperada para OBSERVAÇÃO: {cor_obs}")
+        self.assertTrue(cor_pgto.endswith("FFF2CC"), f"Cor inesperada para DATA DO PAGAMENTO: {cor_pgto}")
+        self.assertTrue(cor_baixa.endswith("FFF2CC"), f"Cor inesperada para DATA DA BAIXA: {cor_baixa}")
+
+        # 3. Verifica fonte âmbar em negrito (8A5300)
+        self.assertTrue(cell_obs.font.bold)
+        self.assertTrue(str(cell_obs.font.color.rgb).upper().endswith("8A5300"))
+
+    def test_generate_report_sem_alerta_visual_quando_dentro_do_limite(self):
+        """Diferença <= 5 dias não dispara texto nem formatação de alerta visual."""
+        resultados = {
+            "1_Conciliado_Perfeito": pd.DataFrame([{
+                "Banco": "CAIXA",
+                "Cliente": "CLIENTE PROXIMO",
+                "Valor": 300.00,
+                "Data": "16/06/2026",
+                "Baixas": "CAIXA",
+                "Data Baixa": "18/06/2026", # 2 dias de diferença (<= 5)
+                "Histórico": "CRED PIX",
+                "Motivo Divergência": "",
+            }]),
+            "2_Conciliado_Via_Historico": pd.DataFrame(),
+            "3_Conciliado_Desmembrado": pd.DataFrame(),
+            "4_Saidas_Estornos": pd.DataFrame(),
+            "5_Divergencias_Pendentes": pd.DataFrame(),
+        }
+
+        ExcelReporter.generate_report(resultados, self.output_path, dias_alerta_temporal=5)
+
+        wb = openpyxl.load_workbook(self.output_path)
+        ws = wb["1 Conciliado Perfeito"]
+
+        colunas = {str(ws.cell(row=1, column=c).value).upper(): c for c in range(1, ws.max_column + 1)}
+        cell_obs = ws.cell(row=2, column=colunas["OBSERVAÇÃO"])
+
+        # OBSERVAÇÃO deve estar vazia
+        self.assertTrue(cell_obs.value is None or str(cell_obs.value).strip() == "")
+        # Cor NÃO deve ser o alerta FFF2CC
+        cor_obs = str(cell_obs.fill.start_color.rgb or "").upper()
+        self.assertFalse(cor_obs.endswith("FFF2CC"))
+
+    def test_generate_report_override_configuravel_limite_dias(self):
+        """Valida que o parâmetro dias_alerta_temporal é configurável."""
+        resultados = {
+            "1_Conciliado_Perfeito": pd.DataFrame([{
+                "Banco": "BANESE",
+                "Cliente": "CLIENTE TESTE",
+                "Valor": 250.00,
+                "Data": "10/06/2026",
+                "Baixas": "BANESE",
+                "Data Baixa": "18/06/2026", # 8 dias de diferença
+                "Histórico": "PIX",
+                "Motivo Divergência": "",
+            }]),
+            "2_Conciliado_Via_Historico": pd.DataFrame(),
+            "3_Conciliado_Desmembrado": pd.DataFrame(),
+            "4_Saidas_Estornos": pd.DataFrame(),
+            "5_Divergencias_Pendentes": pd.DataFrame(),
+        }
+
+        # Com limite = 10 dias, 8 dias NÃO gera alerta
+        ExcelReporter.generate_report(resultados, self.output_path, dias_alerta_temporal=10)
+        wb = openpyxl.load_workbook(self.output_path)
+        ws = wb["1 Conciliado Perfeito"]
+        colunas = {str(ws.cell(row=1, column=c).value).upper(): c for c in range(1, ws.max_column + 1)}
+        val_obs = ws.cell(row=2, column=colunas["OBSERVAÇÃO"]).value
+        self.assertTrue(val_obs is None or str(val_obs).strip() == "")
+
+        # Com limite = 5 dias, 8 dias GERA alerta
+        ExcelReporter.generate_report(resultados, self.output_path, dias_alerta_temporal=5)
+        wb = openpyxl.load_workbook(self.output_path)
+        ws = wb["1 Conciliado Perfeito"]
+        val_obs = ws.cell(row=2, column=colunas["OBSERVAÇÃO"]).value
+        self.assertIn("Alerta Temporal: Diferença de 8 dias", str(val_obs))
+
+    def test_execute_pipeline_validacao_soma(self):
+        """Valida se a integridade de soma do pipeline é mantida."""
+        import warnings
+        
+        df_argos = pd.DataFrame([
+            {"Data": "10/06/2026", "Cliente": "CLI A", "Valor": 150.00, "Tipo Evento": "Pix"},
+            {"Data": "11/06/2026", "Cliente": "CLI B", "Valor": 250.00, "Tipo Evento": "Pix"},
+            {"Data": "12/06/2026", "Cliente": "CLI C", "Valor": 50.00, "Tipo Evento": "Estorno"}, # Vai p/ saidas
+        ])
+        df_bank = pd.DataFrame([
+            {"Data": "10/06/2026", "Histórico": "PIX CLI A", "Valor": 150.00, "Banco": "BANESE"}, # Perfeito
+            {"Data": "15/06/2026", "Histórico": "DOC QUALQUER", "Valor": 80.00, "Banco": "BANESE"}, # Sobra banco
+        ])
+        
+        conciliador = ReconciliationEngine(df_argos, df_bank)
+        
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            resultados = conciliador.execute_pipeline()
+            
+            # Verifica se NÃO houve aviso CRÍTICO de integridade financeira
+            avisos_criticos = [str(av.message) for av in w if "CRÍTICO: Perda de integridade" in str(av.message)]
+            self.assertEqual(len(avisos_criticos), 0, "Ocorreu uma perda de integridade inesperada!")
+
+        soma_argos_inicial = 150.0 + 250.0 # O estorno de 50.0 é retirado do argos pendente e vai pra saidas_estornos
+        soma_resultados = 0.0
+        for k in ['1_Conciliado_Perfeito', '2_Conciliado_Via_Historico', '3_Conciliado_Desmembrado']:
+            if not resultados[k].empty:
+                soma_resultados += resultados[k]['Valor'].sum()
+                
+        if not resultados['5_Divergencias_Pendentes'].empty:
+            df_div = resultados['5_Divergencias_Pendentes']
+            soma_resultados += df_div[df_div['Motivo Divergência'] == 'Falta no Banco']['Valor'].sum()
+            
+        self.assertAlmostEqual(soma_argos_inicial, soma_resultados, places=2)
 
 
 if __name__ == "__main__":
