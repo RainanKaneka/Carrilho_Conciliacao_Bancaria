@@ -264,7 +264,7 @@ class TestReconciliationEnginePipeline(unittest.TestCase):
     def setUp(self):
         self.colunas_obrigatorias = [
             "Banco", "Cliente", "Valor", "Data",
-            "Baixas", "Data Baixa", "Histórico", "Motivo Divergência"
+            "Baixas", "Data Baixa", "Histórico", "Motivo Divergência", "Regra Aplicada"
         ]
         self.chaves_obrigatorias = {
             "0_Resumo_Executivo",

@@ -401,7 +401,8 @@ class ReconciliationEngine:
                     'Histórico': row.get('Histórico', ''),
                     'Baixas': '',
                     'Data Baixa': '',
-                    'Motivo Divergência': 'Estorno (Argos)'
+                    'Motivo Divergência': 'Estorno (Argos)',
+                    'Regra Aplicada': 'N/A'
                 })
             self.df_argos = self.df_argos[~is_estorno & (self.df_argos['Valor'] > 0)]
 
@@ -417,7 +418,8 @@ class ReconciliationEngine:
                     'Histórico': row.get('Histórico', ''),
                     'Baixas': '',
                     'Data Baixa': '',
-                    'Motivo Divergência': 'Saída (Banco)'
+                    'Motivo Divergência': 'Saída (Banco)',
+                    'Regra Aplicada': 'N/A'
                 })
             self.df_bank = self.df_bank[~is_saida & (self.df_bank['Valor'] > 0)]
 
@@ -465,7 +467,7 @@ class ReconciliationEngine:
 
         if self.df_argos.empty or self.df_bank.empty:
             for k in resultados.keys():
-                resultados[k] = pd.DataFrame(columns=['Banco', 'Cliente', 'Valor', 'Data', 'Histórico', 'Baixas', 'Data Baixa', 'Motivo Divergência'])
+                resultados[k] = pd.DataFrame(columns=['Banco', 'Cliente', 'Valor', 'Data', 'Histórico', 'Baixas', 'Data Baixa', 'Motivo Divergência', 'Regra Aplicada'])
             
             soma_input = self.df_argos['Valor'].sum() if not self.df_argos.empty else 0.0
             status_msg = "OK - Nenhum centavo perdido ou duplicado" if soma_input == 0 else "ERRO (Perda/Duplicação identificada)"
@@ -620,12 +622,14 @@ class ReconciliationEngine:
                                 nota_principal = row_a.to_dict().copy()
                                 nota_principal['Baixas'] = row_b['Banco']
                                 nota_principal['Data Baixa'] = row_b['Data']
+                                nota_principal['Regra Aplicada'] = 'Regra 2.5 (Desmembrado Guiado por Histórico)'
                                 resultados['3_Conciliado_Desmembrado'].append(nota_principal)
                                 m_a.append(row_a['ID_Argos'])
                                 
                                 for np in comb_encontrada:
                                     np['Baixas'] = row_b['Banco']
                                     np['Data Baixa'] = row_b['Data']
+                                    np['Regra Aplicada'] = 'Regra 2.5 (Desmembrado Guiado por Histórico)'
                                     resultados['3_Conciliado_Desmembrado'].append(np)
                                     m_a.append(np['ID_Argos'])
                                     
@@ -639,6 +643,7 @@ class ReconciliationEngine:
                                 nota['Data Baixa'] = row_b['Data']
                                 sinal = "+" if valor_faltante > 0 else ""
                                 nota['Motivo Divergência'] = f'Desconto/Acréscimo no PIX ({sinal}R$ {valor_faltante})'
+                                nota['Regra Aplicada'] = 'Regra 2 (Aproximação de Valor via Histórico)'
                                 resultados['2_Conciliado_Via_Historico'].append(nota)
                                 m_a.append(row_a['ID_Argos'])
                                 m_b.append(row_b['ID_Bank'])
@@ -683,6 +688,7 @@ class ReconciliationEngine:
                                 sinal = "+" if diff_valor > 0 else ""
                                 nota['Motivo Divergência'] = f'Aproximação de Centavos ({sinal}R$ {diff_valor})'
                                 
+                            nota['Regra Aplicada'] = 'Regra 0.5 (Match por Nome no Histórico)'
                             resultados['1_Conciliado_Perfeito'].append(nota)
                             m_a.append(row_a['ID_Argos'])
                             m_b.append(row_b['ID_Bank'])
@@ -709,6 +715,7 @@ class ReconciliationEngine:
             nota = row_a.to_dict().copy()
             nota['Baixas'] = row_b['Banco']
             nota['Data Baixa'] = row_b['Data']
+            nota['Regra Aplicada'] = 'Regra 1.1 (Valor Único em Ambos)'
             resultados['1_Conciliado_Perfeito'].append(nota)
             
             m_a.append(row_a['ID_Argos'])
@@ -777,6 +784,7 @@ class ReconciliationEngine:
                         nota = row_a.to_dict().copy()
                         nota['Baixas'] = row_b['Banco']
                         nota['Data Baixa'] = row_b['Data']
+                        nota['Regra Aplicada'] = 'Regra 1 (Match Exato com/sem Nome)'
                         resultados['1_Conciliado_Perfeito'].append(nota)
                         m_a.append(row_a['ID_Argos'])
                         m_b.append(row_b['ID_Bank'])
@@ -825,6 +833,7 @@ class ReconciliationEngine:
                     nota = item[2].copy()
                     nota['Baixas'] = row_b['Banco']
                     nota['Data Baixa'] = row_b['Data']
+                    nota['Regra Aplicada'] = 'Regra 3 (Combinação de Múltiplas Notas)'
                     resultados['3_Conciliado_Desmembrado'].append(nota)
                     m_a_temp.append(item[0])
                 m_b_temp.append(row_b['ID_Bank'])
@@ -855,6 +864,7 @@ class ReconciliationEngine:
                             diff_valor = round(row_b['Valor'] - row_a['Valor'], 2)
                             sinal = "+" if diff_valor > 0 else ""
                             nota['Motivo Divergência'] = f'Aproximação de Centavos ({sinal}R$ {diff_valor})'
+                            nota['Regra Aplicada'] = 'Regra 3.5 (Aproximação de Centavos)'
                             resultados['1_Conciliado_Perfeito'].append(nota)
                             m_a.append(row_a['ID_Argos'])
                             m_b.append(row_b['ID_Bank'])
@@ -869,6 +879,7 @@ class ReconciliationEngine:
             nota['Data Baixa'] = nota['Data']
             nota['Data'] = ''
             nota['Motivo Divergência'] = 'Falta no Banco'
+            nota['Regra Aplicada'] = 'N/A'
             resultados['5_Divergencias_Pendentes'].append(nota)
             
         for i, row_b in bank_pendentes.iterrows():
@@ -879,15 +890,16 @@ class ReconciliationEngine:
                 col_cliente: row_b.get(col_hist_b, 'N/A'),
                 'Valor': row_b['Valor'],
                 'Data': row_b['Data'],
-                'Motivo Divergência': 'Sobrou no Banco / Faltou no Argos'
+                'Motivo Divergência': 'Sobrou no Banco / Faltou no Argos',
+                'Regra Aplicada': 'N/A'
             }
             resultados['5_Divergencias_Pendentes'].append(nota)
 
         # ==========================================
         # FORMATAÇÃO FINAL DAS COLUNAS (Alinhado com o Template da Cliente)
-        # Ordem Exata: Banco | Cliente | Valor | Data (Pgto) | Baixas (Banco Baixa) | Data Baixa | Histórico | Motivo
+        # Ordem Exata: Banco | Cliente | Valor | Data (Pgto) | Baixas (Banco Baixa) | Data Baixa | Histórico | Motivo | Regra Aplicada
         # ==========================================
-        ordem_colunas = ['Banco', 'Cliente', 'Valor', 'Data', 'Baixas', 'Data Baixa', 'Histórico', 'Motivo Divergência']
+        ordem_colunas = ['Banco', 'Cliente', 'Valor', 'Data', 'Baixas', 'Data Baixa', 'Histórico', 'Motivo Divergência', 'Regra Aplicada']
         
         for k in resultados.keys():
             df = pd.DataFrame(resultados[k])
@@ -1050,10 +1062,11 @@ class ExcelReporter:
             'Data Baixa': 'DATA DA BAIXA',
             'OBS': 'HISTÓRICO',
             'Histórico': 'HISTÓRICO',
-            'Motivo Divergência': 'MOTIVO DIVERGÊNCIA'
+            'Motivo Divergência': 'MOTIVO DIVERGÊNCIA',
+            'Regra Aplicada': 'REGRA APLICADA'
         }
         
-        ordem_desejada = ['BANCO', 'CLIENTE', 'VALOR DA BAIXA', 'DATA DO PAGAMENTO', 'BANCO DA BAIXA', 'DATA DA BAIXA', 'HISTÓRICO', 'MOTIVO DIVERGÊNCIA']
+        ordem_desejada = ['BANCO', 'CLIENTE', 'VALOR DA BAIXA', 'DATA DO PAGAMENTO', 'BANCO DA BAIXA', 'DATA DA BAIXA', 'HISTÓRICO', 'MOTIVO DIVERGÊNCIA', 'REGRA APLICADA']
         
         for sheet_name, df in data_sheets.items():
             novo_nome_aba = sheet_name.replace('_', ' ')
