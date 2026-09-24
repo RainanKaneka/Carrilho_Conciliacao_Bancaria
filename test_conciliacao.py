@@ -24,6 +24,7 @@ Execução:
 import os
 import tempfile
 import unittest
+import re
 import pandas as pd
 import openpyxl
 
@@ -266,6 +267,7 @@ class TestReconciliationEnginePipeline(unittest.TestCase):
             "Baixas", "Data Baixa", "Histórico", "Motivo Divergência"
         ]
         self.chaves_obrigatorias = {
+            "0_Resumo_Executivo",
             "1_Conciliado_Perfeito",
             "2_Conciliado_Via_Historico",
             "3_Conciliado_Desmembrado",
@@ -298,7 +300,7 @@ class TestReconciliationEnginePipeline(unittest.TestCase):
         self.assertEqual(set(resultado.keys()), self.chaves_obrigatorias)
         for chave, df in resultado.items():
             self.assertIsInstance(df, pd.DataFrame, f"A chave '{chave}' deve conter um DataFrame.")
-            if chave == "6_Resumo_Integridade":
+            if chave in ["0_Resumo_Executivo", "6_Resumo_Integridade"]:
                 self.assertEqual(list(df.columns), ["Métrica", "Valor"])
             else:
                 self.assertEqual(list(df.columns), self.colunas_obrigatorias)
@@ -310,7 +312,7 @@ class TestReconciliationEnginePipeline(unittest.TestCase):
 
         self.assertEqual(set(resultado.keys()), self.chaves_obrigatorias)
         for chave, df in resultado.items():
-            if chave == "6_Resumo_Integridade":
+            if chave in ["0_Resumo_Executivo", "6_Resumo_Integridade"]:
                 self.assertFalse(df.empty)
                 self.assertEqual(list(df.columns), ["Métrica", "Valor"])
             else:
@@ -599,6 +601,9 @@ class TestExcelReporter(unittest.TestCase):
         wb = openpyxl.load_workbook(self.output_path)
         nomes_abas = wb.sheetnames
 
+        # Certifica que a primeira aba é o Resumo Executivo
+        self.assertEqual(nomes_abas[0], "0 Resumo Executivo")
+
         # Nomes esperados após substituição de underscore por espaço:
         for chave in resultados.keys():
             nome_esperado = chave.replace("_", " ")
@@ -881,6 +886,231 @@ class TestSecurityCORS(unittest.TestCase):
         # 3. Origem não autorizada (maliciosa) deve ser BLOQUEADA (sem cabeçalho Access-Control-Allow-Origin)
         res_blocked = client.get("/", headers={"Origin": "https://site-malicioso.com"})
         self.assertIsNone(res_blocked.headers.get("access-control-allow-origin"))
+
+
+class TestResumoExecutivo(unittest.TestCase):
+    """Testa a geração, formatação, integridade e assinatura digital da aba Resumo Executivo (Fase 2.2)."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.output_path = os.path.join(self.temp_dir.name, "teste_executivo.xlsx")
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_resumo_executivo_primeira_aba_no_dict_e_no_excel(self):
+        """0_Resumo_Executivo deve ser a PRIMEIRA chave retornada e a PRIMEIRA aba criada no Excel."""
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Cliente": ["CLIENTE A"],
+            "Valor": [100.00],
+            "Data": ["16/06/2026"],
+            "Histórico": ["TESTE"],
+            "Tipo Evento": ["Venda"],
+        })
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["CREDITO"],
+            "Valor": [100.00],
+            "Data": ["16/06/2026"],
+            "Tipo": ["C"],
+        })
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        res = engine.execute_pipeline()
+
+        # 1. Primeira chave do dicionário
+        primeira_chave = list(res.keys())[0]
+        self.assertEqual(primeira_chave, "0_Resumo_Executivo")
+
+        # 2. Primeira aba do Excel
+        file_hash = ExcelReporter.generate_report(res, self.output_path)
+        self.assertTrue(os.path.exists(self.output_path))
+        self.assertIsInstance(file_hash, str)
+        self.assertEqual(len(file_hash), 64)
+
+        wb = openpyxl.load_workbook(self.output_path)
+        self.assertEqual(wb.sheetnames[0], "0 Resumo Executivo")
+
+    def test_resumo_executivo_contem_todos_os_campos_obrigatorios(self):
+        """Resumo Executivo deve conter totais, taxa de sucesso, data/hora e assinatura digital."""
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA", "CAIXA"],
+            "Cliente": ["CLIENTE 1", "CLIENTE 2"],
+            "Valor": [200.00, 300.00],
+            "Data": ["10/06/2026", "11/06/2026"],
+            "Histórico": ["Venda 1", "Venda 2"],
+            "Tipo Evento": ["Venda", "Venda"],
+        })
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["CREDITO 1"],
+            "Valor": [200.00],
+            "Data": ["10/06/2026"],
+            "Tipo": ["C"],
+        })
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        res = engine.execute_pipeline()
+
+        df_exec = res["0_Resumo_Executivo"]
+        self.assertEqual(list(df_exec.columns), ["Métrica", "Valor"])
+
+        metricas = dict(zip(df_exec["Métrica"], df_exec["Valor"]))
+
+        # 1. Data e Hora
+        self.assertIn("Data/Hora de Processamento", metricas)
+        data_hora = str(metricas["Data/Hora de Processamento"])
+        self.assertTrue(re.match(r"^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}$", data_hora))
+
+        # 2. Status da Conciliação
+        self.assertIn("Status da Conciliação", metricas)
+
+        # 3. Taxa de Sucesso
+        self.assertIn("Taxa de Sucesso (Registros)", metricas)
+        self.assertIn("Taxa de Sucesso (Financeira)", metricas)
+        self.assertTrue(str(metricas["Taxa de Sucesso (Registros)"]).endswith("%"))
+        self.assertTrue(str(metricas["Taxa de Sucesso (Financeira)"]).endswith("%"))
+
+        # 4. Totais
+        self.assertIn("Total de Registros Argos", metricas)
+        self.assertEqual(metricas["Total de Registros Argos"], 2)
+        self.assertIn("Total Volume Argos (R$)", metricas)
+        self.assertAlmostEqual(metricas["Total Volume Argos (R$)"], 500.00, places=2)
+        self.assertIn("Total de Registros Banco", metricas)
+        self.assertEqual(metricas["Total de Registros Banco"], 1)
+        self.assertIn("Total Volume Banco (R$)", metricas)
+        self.assertAlmostEqual(metricas["Total Volume Banco (R$)"], 200.00, places=2)
+
+        self.assertIn("Total Conciliado (Registros)", metricas)
+        self.assertEqual(metricas["Total Conciliado (Registros)"], 1)
+        self.assertIn("Total Conciliado (R$)", metricas)
+        self.assertAlmostEqual(metricas["Total Conciliado (R$)"], 200.00, places=2)
+
+        self.assertIn("Total Divergências Pendentes (Registros)", metricas)
+        self.assertEqual(metricas["Total Divergências Pendentes (Registros)"], 1)
+        self.assertIn("Total Divergências Pendentes (R$)", metricas)
+        self.assertAlmostEqual(metricas["Total Divergências Pendentes (R$)"], 300.00, places=2)
+
+        # 5. Assinatura Digital (Hash SHA-256)
+        self.assertIn("Assinatura Digital (Hash SHA-256)", metricas)
+        hash_sha256 = str(metricas["Assinatura Digital (Hash SHA-256)"])
+        self.assertEqual(len(hash_sha256), 64)
+        self.assertTrue(re.match(r"^[0-9a-f]{64}$", hash_sha256))
+
+    def test_taxa_sucesso_calculo_correto(self):
+        """Valida que a taxa de sucesso percentual é calculada com exatidão matemática."""
+        # 3 conciliados perfeitos + 1 divergência = 3/4 = 75.00%
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA"] * 4,
+            "Cliente": ["CLIENTE 1", "CLIENTE 2", "CLIENTE 3", "CLIENTE 4"],
+            "Valor": [100.0, 200.0, 300.0, 400.0],
+            "Data": ["10/06/2026", "11/06/2026", "12/06/2026", "13/06/2026"],
+            "Histórico": ["Venda 1", "Venda 2", "Venda 3", "Venda 4"],
+            "Tipo Evento": ["Venda"] * 4,
+        })
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"] * 3,
+            "Histórico": ["CREDITO 1", "CREDITO 2", "CREDITO 3"],
+            "Valor": [100.0, 200.0, 300.0],
+            "Data": ["10/06/2026", "11/06/2026", "12/06/2026"],
+            "Tipo": ["C"] * 3,
+        })
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        res = engine.execute_pipeline()
+
+        df_exec = res["0_Resumo_Executivo"]
+        metricas = dict(zip(df_exec["Métrica"], df_exec["Valor"]))
+
+        self.assertEqual(metricas["Taxa de Sucesso (Registros)"], "75.00%")
+        self.assertEqual(metricas["Taxa de Sucesso (Financeira)"], "60.00%")
+
+    def test_assinatura_digital_sha256_consistente_e_sensivel_a_alteracoes(self):
+        """A assinatura digital é determinística para mesmos dados e sensível (efeito avalanche) para qualquer alteração."""
+        df_argos_1 = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Cliente": ["CLIENTE A"],
+            "Valor": [100.00],
+            "Data": ["16/06/2026"],
+            "Histórico": ["TESTE"],
+        })
+        df_bank_1 = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["CREDITO"],
+            "Valor": [100.00],
+            "Data": ["16/06/2026"],
+            "Tipo": ["C"],
+        })
+
+        resultados_dummy = {
+            "1_Conciliado_Perfeito": df_argos_1.copy(),
+            "5_Divergencias_Pendentes": pd.DataFrame(),
+        }
+
+        # Mesmo timestamp e dados idênticos geram o mesmo hash
+        fixed_ts = "24/09/2026 12:00:00"
+        hash_1 = ReconciliationEngine._calcular_assinatura_digital(df_argos_1, df_bank_1, resultados_dummy, fixed_ts)
+        hash_2 = ReconciliationEngine._calcular_assinatura_digital(df_argos_1.copy(), df_bank_1.copy(), resultados_dummy, fixed_ts)
+        self.assertEqual(hash_1, hash_2)
+        self.assertEqual(len(hash_1), 64)
+
+        # Alterando apenas 1 centavo no valor de entrada
+        df_argos_modificado = df_argos_1.copy()
+        df_argos_modificado.loc[0, "Valor"] = 100.01
+        hash_alterado = ReconciliationEngine._calcular_assinatura_digital(df_argos_modificado, df_bank_1, resultados_dummy, fixed_ts)
+        self.assertNotEqual(hash_1, hash_alterado)
+
+    def test_resumo_executivo_formatacao_visual_excel(self):
+        """Verifica estilos do Excel (cabeçalho verde, colunas formatadas, largura da assinatura digital)."""
+        df_argos = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Cliente": ["CLIENTE A"],
+            "Valor": [1500.50],
+            "Data": ["16/06/2026"],
+            "Histórico": ["TESTE"],
+            "Tipo Evento": ["Venda"],
+        })
+        df_bank = pd.DataFrame({
+            "Banco": ["CAIXA"],
+            "Histórico": ["CREDITO"],
+            "Valor": [1500.50],
+            "Data": ["16/06/2026"],
+            "Tipo": ["C"],
+        })
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        res = engine.execute_pipeline()
+
+        ExcelReporter.generate_report(res, self.output_path)
+
+        wb = openpyxl.load_workbook(self.output_path)
+        ws = wb["0 Resumo Executivo"]
+
+        # Cabeçalho
+        self.assertEqual(ws.cell(row=1, column=1).value, "Métrica")
+        self.assertEqual(ws.cell(row=1, column=2).value, "Valor")
+        self.assertEqual(ws.cell(row=1, column=1).fill.start_color.rgb, "00266C40")
+        self.assertTrue(ws.cell(row=1, column=1).font.bold)
+
+        # Verifica que a coluna VALOR tem largura suficiente para comportar o hash SHA-256 (64 chars)
+        largura_col_b = ws.column_dimensions["B"].width
+        self.assertGreaterEqual(largura_col_b, 65)
+
+    def test_resumo_executivo_com_entradas_vazias(self):
+        """Resumo Executivo deve ser gerado com segurança mesmo com entradas vazias."""
+        engine = ReconciliationEngine(pd.DataFrame(), pd.DataFrame())
+        res = engine.execute_pipeline()
+
+        self.assertIn("0_Resumo_Executivo", res)
+        df_exec = res["0_Resumo_Executivo"]
+        self.assertFalse(df_exec.empty)
+        metricas = dict(zip(df_exec["Métrica"], df_exec["Valor"]))
+
+        self.assertEqual(metricas["Status da Conciliação"], "Entradas Vazias")
+        self.assertEqual(metricas["Taxa de Sucesso (Registros)"], "0.00%")
+        self.assertEqual(metricas["Total de Registros Argos"], 0)
+        self.assertEqual(len(metricas["Assinatura Digital (Hash SHA-256)"]), 64)
 
 
 if __name__ == "__main__":

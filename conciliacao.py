@@ -4,6 +4,8 @@ import pandas as pd
 import re
 import pdfplumber
 import itertools
+import hashlib
+from datetime import datetime
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
@@ -426,6 +428,28 @@ class ReconciliationEngine:
         if not self.df_bank.empty:
             self.df_bank['ID_Bank'] = range(len(self.df_bank))
 
+    @staticmethod
+    def _calcular_assinatura_digital(df_argos: pd.DataFrame, df_bank: pd.DataFrame, resultados: dict, timestamp_str: str) -> str:
+        """Calcula a assinatura digital (hash SHA-256) representativa dos dados e parâmetros da conciliação."""
+        hasher = hashlib.sha256()
+        hasher.update(timestamp_str.encode('utf-8'))
+        
+        # Hash dos DataFrames de entrada
+        if not df_argos.empty:
+            hasher.update(df_argos.to_csv(index=False).encode('utf-8'))
+        if not df_bank.empty:
+            hasher.update(df_bank.to_csv(index=False).encode('utf-8'))
+            
+        # Hash dos totais por categoria
+        for k in sorted(resultados.keys()):
+            df_k = resultados[k]
+            if isinstance(df_k, pd.DataFrame) and not df_k.empty:
+                total_k = round(float(df_k['Valor'].sum()), 2) if 'Valor' in df_k.columns else 0.0
+                qtd_k = len(df_k)
+                hasher.update(f"{k}:{qtd_k}:{total_k}".encode('utf-8'))
+                
+        return hasher.hexdigest()
+
     def execute_pipeline(self):
         import pandas as pd
         import re
@@ -444,15 +468,55 @@ class ReconciliationEngine:
                 resultados[k] = pd.DataFrame(columns=['Banco', 'Cliente', 'Valor', 'Data', 'Histórico', 'Baixas', 'Data Baixa', 'Motivo Divergência'])
             
             soma_input = self.df_argos['Valor'].sum() if not self.df_argos.empty else 0.0
-            resultados['6_Resumo_Integridade'] = pd.DataFrame([
-                {"Métrica": "Total Input Argos", "Valor": soma_input},
+            status_msg = "OK - Nenhum centavo perdido ou duplicado" if soma_input == 0 else "ERRO (Perda/Duplicação identificada)"
+            df_integridade = pd.DataFrame([
+                {"Métrica": "Total Input Argos", "Valor": round(soma_input, 2)},
                 {"Métrica": "Total Output Conciliado", "Valor": 0.0},
                 {"Métrica": "Total Output Divergências (Falta Banco)", "Valor": 0.0},
                 {"Métrica": "Total Output (Conciliado + Divergências)", "Valor": 0.0},
-                {"Métrica": "Diferença (Perda/Duplicação)", "Valor": soma_input},
-                {"Métrica": "Status da Integridade", "Valor": "OK - Nenhum centavo perdido ou duplicado" if soma_input == 0 else "ERRO (Perda/Duplicação identificada)"},
+                {"Métrica": "Diferença (Perda/Duplicação)", "Valor": round(soma_input, 2)},
+                {"Métrica": "Status da Integridade", "Valor": status_msg},
             ])
-            return resultados
+
+            timestamp_execucao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            assinatura_sha256 = self._calcular_assinatura_digital(
+                self.df_argos, self.df_bank, resultados, timestamp_execucao
+            )
+
+            df_executivo = pd.DataFrame([
+                {"Métrica": "Data/Hora de Processamento", "Valor": timestamp_execucao},
+                {"Métrica": "Status da Conciliação", "Valor": "Entradas Vazias"},
+                {"Métrica": "Taxa de Sucesso (Registros)", "Valor": "0.00%"},
+                {"Métrica": "Taxa de Sucesso (Financeira)", "Valor": "0.00%"},
+                {"Métrica": "Total de Registros Argos", "Valor": len(self.df_argos)},
+                {"Métrica": "Total Volume Argos (R$)", "Valor": round(soma_input, 2)},
+                {"Métrica": "Total de Registros Banco", "Valor": len(self.df_bank)},
+                {"Métrica": "Total Volume Banco (R$)", "Valor": 0.0},
+                {"Métrica": "Total Conciliado (Registros)", "Valor": 0},
+                {"Métrica": "Total Conciliado (R$)", "Valor": 0.0},
+                {"Métrica": "  - Match Perfeito (Qtd)", "Valor": 0},
+                {"Métrica": "  - Match Perfeito (R$)", "Valor": 0.0},
+                {"Métrica": "  - Via Histórico (Qtd)", "Valor": 0},
+                {"Métrica": "  - Via Histórico (R$)", "Valor": 0.0},
+                {"Métrica": "  - Desmembrado (Qtd)", "Valor": 0},
+                {"Métrica": "  - Desmembrado (R$)", "Valor": 0.0},
+                {"Métrica": "Total Saídas / Estornos (Registros)", "Valor": 0},
+                {"Métrica": "Total Saídas / Estornos (R$)", "Valor": 0.0},
+                {"Métrica": "Total Divergências Pendentes (Registros)", "Valor": 0},
+                {"Métrica": "Total Divergências Pendentes (R$)", "Valor": 0.0},
+                {"Métrica": "Status de Integridade Financeira", "Valor": status_msg},
+                {"Métrica": "Assinatura Digital (Hash SHA-256)", "Valor": assinatura_sha256},
+            ])
+
+            return {
+                '0_Resumo_Executivo': df_executivo,
+                '1_Conciliado_Perfeito': resultados['1_Conciliado_Perfeito'],
+                '2_Conciliado_Via_Historico': resultados['2_Conciliado_Via_Historico'],
+                '3_Conciliado_Desmembrado': resultados['3_Conciliado_Desmembrado'],
+                '4_Saidas_Estornos': resultados['4_Saidas_Estornos'],
+                '5_Divergencias_Pendentes': resultados['5_Divergencias_Pendentes'],
+                '6_Resumo_Integridade': df_integridade,
+            }
 
         argos_pendentes = self.df_argos.copy()
         bank_pendentes = self.df_bank.copy()
@@ -874,9 +938,92 @@ class ReconciliationEngine:
             {"Métrica": "Diferença (Perda/Duplicação)", "Valor": round(diff_integridade, 2)},
             {"Métrica": "Status da Integridade", "Valor": status_msg},
         ])
-        resultados['6_Resumo_Integridade'] = df_resumo
 
-        return resultados
+        # ==========================================
+        # ABA RESUMO EXECUTIVO (PRIMEIRA ABA NO EXCEL)
+        # ==========================================
+        qtd_argos = len(self.df_argos) if not self.df_argos.empty else 0
+        qtd_bank = len(self.df_bank) if not self.df_bank.empty else 0
+
+        qtd_perfeitos = len(resultados['1_Conciliado_Perfeito'])
+        qtd_historico = len(resultados['2_Conciliado_Via_Historico'])
+        qtd_desmembrado = len(resultados['3_Conciliado_Desmembrado'])
+        qtd_saidas_estornos = len(resultados['4_Saidas_Estornos'])
+        qtd_divergencias = len(resultados['5_Divergencias_Pendentes'])
+
+        soma_bank = round(float(self.df_bank['Valor'].sum()), 2) if not self.df_bank.empty and 'Valor' in self.df_bank.columns else 0.0
+        soma_perfeitos = round(float(resultados['1_Conciliado_Perfeito']['Valor'].sum()), 2) if not resultados['1_Conciliado_Perfeito'].empty else 0.0
+        soma_historico = round(float(resultados['2_Conciliado_Via_Historico']['Valor'].sum()), 2) if not resultados['2_Conciliado_Via_Historico'].empty else 0.0
+        soma_desmembrado = round(float(resultados['3_Conciliado_Desmembrado']['Valor'].sum()), 2) if not resultados['3_Conciliado_Desmembrado'].empty else 0.0
+        soma_saidas_estornos = round(float(resultados['4_Saidas_Estornos']['Valor'].sum()), 2) if not resultados['4_Saidas_Estornos'].empty else 0.0
+        soma_divergencias = round(float(resultados['5_Divergencias_Pendentes']['Valor'].sum()), 2) if not resultados['5_Divergencias_Pendentes'].empty else 0.0
+
+        qtd_conciliados = qtd_perfeitos + qtd_historico + qtd_desmembrado
+        soma_conciliados = round(soma_perfeitos + soma_historico + soma_desmembrado, 2)
+
+        qtd_sucesso_total = qtd_conciliados + qtd_saidas_estornos
+        soma_sucesso_total = round(soma_conciliados + soma_saidas_estornos, 2)
+
+        total_itens_processados = qtd_sucesso_total + qtd_divergencias
+
+        if total_itens_processados > 0:
+            taxa_sucesso_qtd = (qtd_sucesso_total / total_itens_processados) * 100.0
+        else:
+            taxa_sucesso_qtd = 100.0 if qtd_argos == 0 else 0.0
+
+        base_financeira = soma_sucesso_total + soma_divergencias
+        if base_financeira > 0:
+            taxa_sucesso_valor = (soma_sucesso_total / base_financeira) * 100.0
+        elif soma_input > 0:
+            taxa_sucesso_valor = (soma_sucesso_total / soma_input) * 100.0
+        else:
+            taxa_sucesso_valor = 100.0 if qtd_argos == 0 else 0.0
+
+        timestamp_execucao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        assinatura_sha256 = self._calcular_assinatura_digital(
+            self.df_argos, self.df_bank, resultados, timestamp_execucao
+        )
+
+        status_conciliacao = (
+            "Concluída com Sucesso" if diff_integridade <= TOLERANCIA_INTEGRIDADE and qtd_divergencias == 0
+            else "Concluída com Divergências Pendentes" if diff_integridade <= TOLERANCIA_INTEGRIDADE
+            else "Atenção: Diferença de Integridade Detectada"
+        )
+
+        df_executivo = pd.DataFrame([
+            {"Métrica": "Data/Hora de Processamento", "Valor": timestamp_execucao},
+            {"Métrica": "Status da Conciliação", "Valor": status_conciliacao},
+            {"Métrica": "Taxa de Sucesso (Registros)", "Valor": f"{taxa_sucesso_qtd:.2f}%"},
+            {"Métrica": "Taxa de Sucesso (Financeira)", "Valor": f"{taxa_sucesso_valor:.2f}%"},
+            {"Métrica": "Total de Registros Argos", "Valor": int(qtd_argos)},
+            {"Métrica": "Total Volume Argos (R$)", "Valor": round(soma_input, 2)},
+            {"Métrica": "Total de Registros Banco", "Valor": int(qtd_bank)},
+            {"Métrica": "Total Volume Banco (R$)", "Valor": round(soma_bank, 2)},
+            {"Métrica": "Total Conciliado (Registros)", "Valor": int(qtd_conciliados)},
+            {"Métrica": "Total Conciliado (R$)", "Valor": round(soma_conciliados, 2)},
+            {"Métrica": "  - Match Perfeito (Qtd)", "Valor": int(qtd_perfeitos)},
+            {"Métrica": "  - Match Perfeito (R$)", "Valor": round(soma_perfeitos, 2)},
+            {"Métrica": "  - Via Histórico (Qtd)", "Valor": int(qtd_historico)},
+            {"Métrica": "  - Via Histórico (R$)", "Valor": round(soma_historico, 2)},
+            {"Métrica": "  - Desmembrado (Qtd)", "Valor": int(qtd_desmembrado)},
+            {"Métrica": "  - Desmembrado (R$)", "Valor": round(soma_desmembrado, 2)},
+            {"Métrica": "Total Saídas / Estornos (Registros)", "Valor": int(qtd_saidas_estornos)},
+            {"Métrica": "Total Saídas / Estornos (R$)", "Valor": round(soma_saidas_estornos, 2)},
+            {"Métrica": "Total Divergências Pendentes (Registros)", "Valor": int(qtd_divergencias)},
+            {"Métrica": "Total Divergências Pendentes (R$)", "Valor": round(soma_divergencias, 2)},
+            {"Métrica": "Status de Integridade Financeira", "Valor": status_msg},
+            {"Métrica": "Assinatura Digital (Hash SHA-256)", "Valor": assinatura_sha256},
+        ])
+
+        return {
+            '0_Resumo_Executivo': df_executivo,
+            '1_Conciliado_Perfeito': resultados['1_Conciliado_Perfeito'],
+            '2_Conciliado_Via_Historico': resultados['2_Conciliado_Via_Historico'],
+            '3_Conciliado_Desmembrado': resultados['3_Conciliado_Desmembrado'],
+            '4_Saidas_Estornos': resultados['4_Saidas_Estornos'],
+            '5_Divergencias_Pendentes': resultados['5_Divergencias_Pendentes'],
+            '6_Resumo_Integridade': df_resumo,
+        }
 
 
 
@@ -910,7 +1057,7 @@ class ExcelReporter:
         
         for sheet_name, df in data_sheets.items():
             novo_nome_aba = sheet_name.replace('_', ' ')
-            if 'Resumo Integridade' in novo_nome_aba:
+            if 'Resumo Integridade' in novo_nome_aba or 'Resumo Executivo' in novo_nome_aba:
                 formatted_sheets[novo_nome_aba] = df
                 continue
                 
@@ -950,7 +1097,7 @@ class ExcelReporter:
                     continue
                 
                 for col in df.columns:
-                    if 'DATA' in col.upper():
+                    if 'DATA' in col.upper() and 'RESUMO' not in sheet_name.upper():
                         df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce').dt.strftime('%d/%m/%Y').replace('NaT', '')
 
                 df.to_excel(writer, sheet_name=sheet_name, index=False, startrow=0)
@@ -1023,7 +1170,10 @@ class ExcelReporter:
                             else:
                                 cell.fill = fill_branco
 
-                        if col_name == 'VALOR DA BAIXA' or (sheet_name == '6 Resumo Integridade' and col_name == 'VALOR' and row != 7):
+                        is_resumo_executivo = 'Resumo Executivo' in sheet_name
+                        is_resumo_integridade = 'Resumo Integridade' in sheet_name
+
+                        if col_name == 'VALOR DA BAIXA':
                             cell.alignment = Alignment(horizontal='right', vertical='center', wrap_text=False)
                             if cell.value is not None:
                                 try:
@@ -1031,6 +1181,34 @@ class ExcelReporter:
                                     cell.number_format = 'R$ #,##0.00'
                                 except:
                                     pass
+                        elif is_resumo_integridade and col_name == 'VALOR':
+                            if cell.value is not None:
+                                try:
+                                    cell.value = float(cell.value)
+                                    cell.alignment = Alignment(horizontal='right', vertical='center', wrap_text=False)
+                                    cell.number_format = 'R$ #,##0.00'
+                                except:
+                                    cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=False)
+                        elif is_resumo_executivo and col_name == 'VALOR':
+                            metrica_val = str(worksheet.cell(row=row, column=col_indices.get('MÉTRICA', 1)).value or '')
+                            if '(R$)' in metrica_val or 'Volume' in metrica_val:
+                                try:
+                                    cell.value = float(cell.value)
+                                    cell.alignment = Alignment(horizontal='right', vertical='center', wrap_text=False)
+                                    cell.number_format = 'R$ #,##0.00'
+                                except:
+                                    cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=False)
+                            elif '(Qtd)' in metrica_val or 'Registros' in metrica_val:
+                                try:
+                                    cell.value = int(cell.value)
+                                    cell.alignment = Alignment(horizontal='right', vertical='center', wrap_text=False)
+                                    cell.number_format = '#,##0'
+                                except:
+                                    cell.alignment = Alignment(horizontal='right', vertical='center', wrap_text=False)
+                            elif 'Taxa de Sucesso' in metrica_val:
+                                cell.alignment = Alignment(horizontal='right', vertical='center', wrap_text=False)
+                            else:
+                                cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=False)
 
                 for col_idx in range(1, max_col + 1):
                     max_length = 0
@@ -1063,6 +1241,10 @@ class ExcelReporter:
                         worksheet.column_dimensions[col_letter].width = max(max_length + 2, 45)
                     else:
                         worksheet.column_dimensions[col_letter].width = min(max_length + 2, 50)
+
+        with open(output_path, "rb") as f:
+            file_hash = hashlib.sha256(f.read()).hexdigest()
+        return file_hash
 
 
 if __name__ == "__main__":

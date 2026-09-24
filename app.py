@@ -385,8 +385,8 @@ async def conciliar(
         caminho_saida = pasta_temp / nome_arquivo
 
         logger.info(f"Gerando Excel em: {caminho_saida.name}...")
-        ExcelReporter.generate_report(relatorios, str(caminho_saida))
-        logger.info("Excel gerado com sucesso.")
+        file_hash = ExcelReporter.generate_report(relatorios, str(caminho_saida))
+        logger.info(f"Excel gerado com sucesso (SHA-256: {file_hash}).")
 
         # ── Etapa 7: Ler o Excel gerado para memória e converter para Base64 ──
         with open(caminho_saida, "rb") as f:
