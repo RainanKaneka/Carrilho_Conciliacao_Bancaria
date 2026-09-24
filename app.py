@@ -79,7 +79,7 @@ class AnotacaoUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 try:
     import config
-    from conciliacao import DataCleaner, ReconciliationEngine, ExcelReporter
+    from conciliacao import DataCleaner, ReconciliationEngine, ExcelReporter, CorruptedFileError
 except ImportError as exc:
     print(
         f"[ERRO FATAL] Não foi possível importar 'conciliacao.py' ou 'config.py'.\n"
@@ -336,6 +336,11 @@ async def conciliar(
         caminhos_argos = [_salvar_arquivo(f, pasta_argos) for f in argos_files]
         caminhos_banco = [_salvar_arquivo(f, pasta_banco) for f in banco_files]
 
+        # ── Etapa 2.5: Validar integridade dos arquivos (evita processamento de arquivos corrompidos)
+        logger.info("Validando integridade dos arquivos enviados...")
+        for caminho in caminhos_argos + caminhos_banco:
+            DataCleaner.validate_file(str(caminho))
+
         # ── Etapa 3: Processar arquivos Argos ───────────────────────────
         logger.info(f"Processando {len(caminhos_argos)} arquivo(s) Argos...")
         dfs_argos: list = []
@@ -477,6 +482,18 @@ async def conciliar(
     except HTTPException:
         # Re-lança HTTPExceptions sem modificar (já têm status e mensagem)
         raise
+
+    except CorruptedFileError as exc:
+        mensagem = str(exc)
+        logger.error(f"Arquivo corrompido ou ilegível detectado: {mensagem}")
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Erro de integridade do arquivo: {mensagem}\n\n"
+                f"O arquivo enviado está corrompido, vazio ou não pôde ser aberto pelo Excel. "
+                f"Por favor, verifique se o arquivo abre corretamente no seu computador e tente novamente."
+            ),
+        ) from exc
 
     except (KeyError, ValueError) as exc:
         # Erros esperados: arquivo mal formatado, coluna ausente, etc.

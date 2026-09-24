@@ -34,6 +34,7 @@ from conciliacao import (
     DataCleaner,
     ReconciliationEngine,
     ExcelReporter,
+    CorruptedFileError,
 )
 
 
@@ -1137,6 +1138,165 @@ class TestTimeoutCombinacoes(unittest.TestCase):
         self.assertEqual(len(res_timeout["3_Conciliado_Desmembrado"]), 0)
         self.assertEqual(len(res_timeout["5_Divergencias_Pendentes"]), 4)
 
+
+class TestTratamentoArquivosCorrompidos(unittest.TestCase):
+    """Testa a validação e tratamento robusto de arquivos Excel/banco corrompidos (Fase 2.5)."""
+
+    def setUp(self):
+        self.temp_files = []
+
+    def tearDown(self):
+        for f in self.temp_files:
+            if os.path.exists(f):
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
+
+    def _criar_arquivo_temp(self, suffix=".xlsx", content=b""):
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tf:
+            tf.write(content)
+            self.temp_files.append(tf.name)
+            return tf.name
+
+    def test_validate_excel_arquivo_inexistente(self):
+        """Arquivo inexistente deve levantar FileNotFoundError."""
+        caminho_inexistente = "arquivo_totalmente_inexistente_12345.xlsx"
+        with self.assertRaises(FileNotFoundError):
+            DataCleaner.validate_excel(caminho_inexistente)
+
+        is_valid, motivo = DataCleaner.is_excel_valid(caminho_inexistente)
+        self.assertFalse(is_valid)
+        self.assertIn("não encontrado", motivo.lower())
+
+    def test_validate_excel_arquivo_vazio_zero_bytes(self):
+        """Arquivo com tamanho 0 bytes deve levantar CorruptedFileError."""
+        arquivo_vazio = self._criar_arquivo_temp(suffix=".xlsx", content=b"")
+        with self.assertRaises(CorruptedFileError) as ctx:
+            DataCleaner.validate_excel(arquivo_vazio)
+        self.assertIn("0 bytes", str(ctx.exception).lower())
+
+        is_valid, motivo = DataCleaner.is_excel_valid(arquivo_vazio)
+        self.assertFalse(is_valid)
+        self.assertIn("vazio", motivo.lower())
+
+    def test_validate_excel_arquivo_texto_falso_xlsx(self):
+        """Arquivo de texto puro com extensão .xlsx deve ser rejeitado como ZIP inválido."""
+        fake_xlsx = self._criar_arquivo_temp(suffix=".xlsx", content=b"Isto eh um texto simples fingindo ser excel.")
+        with self.assertRaises(CorruptedFileError) as ctx:
+            DataCleaner.validate_excel(fake_xlsx)
+        self.assertTrue("inválid" in str(ctx.exception).lower() or "corrompido" in str(ctx.exception).lower())
+
+        is_valid, motivo = DataCleaner.is_excel_valid(fake_xlsx)
+        self.assertFalse(is_valid)
+
+    def test_validate_excel_arquivo_zip_sem_estrutura_xlsx(self):
+        """Arquivo ZIP válido mas sem a estrutura interna de planilha Excel ([Content_Types].xml) deve ser rejeitado."""
+        import zipfile
+        fake_zip = self._criar_arquivo_temp(suffix=".xlsx", content=b"")
+        with zipfile.ZipFile(fake_zip, "w") as zf:
+            zf.writestr("arquivo_aleatorio.txt", "conteúdo não excel")
+
+        with self.assertRaises(CorruptedFileError) as ctx:
+            DataCleaner.validate_excel(fake_zip)
+        self.assertIn("estrutura interna", str(ctx.exception).lower())
+
+        is_valid, motivo = DataCleaner.is_excel_valid(fake_zip)
+        self.assertFalse(is_valid)
+
+    def test_validate_excel_arquivo_zip_truncado(self):
+        """Arquivo Excel com pacote ZIP truncado/corrompido deve levantar CorruptedFileError."""
+        valido = self._criar_arquivo_temp(suffix=".xlsx")
+        wb = openpyxl.Workbook()
+        wb.active.title = "Dados"
+        wb.active.append(["A", "B", "C"])
+        wb.save(valido)
+
+        with open(valido, "rb") as f:
+            data = f.read()
+
+        truncado = self._criar_arquivo_temp(suffix=".xlsx", content=data[: len(data) // 2])
+
+        with self.assertRaises(CorruptedFileError):
+            DataCleaner.validate_excel(truncado)
+
+        is_valid, _ = DataCleaner.is_excel_valid(truncado)
+        self.assertFalse(is_valid)
+
+    def test_validate_excel_arquivo_valido(self):
+        """Arquivo Excel legítimo passa na validação sem erros."""
+        valido = self._criar_arquivo_temp(suffix=".xlsx")
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Planilha1"
+        ws.append(["Header1", "Header2"])
+        ws.append(["Valor1", "Valor2"])
+        wb.save(valido)
+
+        # Não deve levantar exceção
+        DataCleaner.validate_excel(valido)
+        is_valid, motivo = DataCleaner.is_excel_valid(valido)
+        self.assertTrue(is_valid)
+        self.assertEqual(motivo, "")
+
+    def test_clean_argos_rejeita_arquivo_corrompido(self):
+        """DataCleaner.clean_argos levanta CorruptedFileError ao receber arquivo corrompido."""
+        corrupto = self._criar_arquivo_temp(suffix=".xlsx", content=b"conteudo_lixo_123")
+        with self.assertRaises(CorruptedFileError):
+            DataCleaner.clean_argos(corrupto)
+
+    def test_clean_bank_rejeita_arquivo_corrompido(self):
+        """DataCleaner.clean_bank levanta CorruptedFileError ao receber arquivo corrompido."""
+        corrupto = self._criar_arquivo_temp(suffix=".xlsx", content=b"conteudo_lixo_456")
+        with self.assertRaises(CorruptedFileError):
+            DataCleaner.clean_bank(corrupto)
+
+    def test_validate_file_pdf_corrompido(self):
+        """DataCleaner.validate_file levanta CorruptedFileError ao receber arquivo PDF corrompido."""
+        fake_pdf = self._criar_arquivo_temp(suffix=".pdf", content=b"nao eh um pdf valido %PDF lixo")
+        with self.assertRaises(CorruptedFileError):
+            DataCleaner.validate_file(fake_pdf)
+
+    def test_api_conciliar_retorna_400_quando_arquivo_corrompido(self):
+        """A API FastAPI POST /api/conciliar retorna HTTP 400 com mensagem detalhada se um arquivo enviado estiver corrompido."""
+        from fastapi.testclient import TestClient
+        from app import app, get_current_user
+        import io
+
+        app.dependency_overrides[get_current_user] = lambda: {"id": "test_user_corrupted"}
+        client = TestClient(app)
+
+        try:
+            # Cria um arquivo válido de banco em memória
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.append(["Data", "Histórico", "Valor"])
+            ws.append(["01/06/2026", "CREDITO", 100.0])
+            banco_bytes = io.BytesIO()
+            wb.save(banco_bytes)
+            banco_bytes.seek(0)
+
+            # Arquivo Argos totalmente corrompido (bytes inválidos)
+            argos_corrupt_bytes = io.BytesIO(b"ISTO_NAO_EH_EXCEL")
+
+            response = client.post(
+                "/api/conciliar",
+                files=[
+                    ("argos_files", ("argos_corrompido.xlsx", argos_corrupt_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")),
+                    ("banco_files", ("banco_valido.xlsx", banco_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")),
+                ],
+                data={"banco_nome": "generico"},
+            )
+
+            self.assertEqual(response.status_code, 400)
+            data_resp = response.json()
+            self.assertIn("detail", data_resp)
+            self.assertTrue(
+                "corrompido" in data_resp["detail"].lower()
+                or "integridade" in data_resp["detail"].lower()
+            )
+        finally:
+            app.dependency_overrides.clear()
 
 
 if __name__ == "__main__":

@@ -1,6 +1,11 @@
 import argparse
 import warnings
+import os
+import zipfile
+import logging
+from pathlib import Path
 import pandas as pd
+import openpyxl
 import re
 import pdfplumber
 import itertools
@@ -11,6 +16,13 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 warnings.filterwarnings('ignore')
+
+logger = logging.getLogger(__name__)
+
+
+class CorruptedFileError(Exception):
+    """Exceção levantada quando um arquivo está corrompido, vazio ou não pode ser aberto pelo Excel/sistema."""
+    pass
 
 import config
 from config import (
@@ -58,6 +70,129 @@ def safe_float(val, default=0.0):
 
 class DataCleaner:
     @staticmethod
+    def is_excel_valid(file_path: str) -> tuple[bool, str]:
+        """
+        Verifica se um arquivo Excel (.xlsx, .xls) pode ser aberto e lido corretamente.
+
+        Retorna:
+            tuple[bool, str]: (True, "") se válido, ou (False, "motivo da falha") se corrompido/inválido.
+        """
+        path = Path(file_path)
+        if not path.exists():
+            return False, f"Arquivo não encontrado: '{file_path}'"
+
+        try:
+            tamanho = path.stat().st_size
+        except OSError as e:
+            return False, f"Erro ao acessar arquivo '{path.name}': {e}"
+
+        if tamanho == 0:
+            return False, f"O arquivo '{path.name}' está vazio (0 bytes) e não pode ser processado."
+
+        ext = path.suffix.lower()
+        if ext == ".xlsx":
+            if not zipfile.is_zipfile(file_path):
+                return False, f"O arquivo '{path.name}' não é um arquivo Excel (.xlsx) válido ou está corrompido (estrutura ZIP inválida)."
+
+            try:
+                with zipfile.ZipFile(file_path, "r") as zf:
+                    bad_file = zf.testzip()
+                    if bad_file:
+                        return False, f"O arquivo '{path.name}' possui blocos de dados corrompidos no arquivo ZIP ({bad_file})."
+                    namelist = zf.namelist()
+                    if "[Content_Types].xml" not in namelist:
+                        return False, f"O arquivo '{path.name}' não possui a estrutura interna esperada de uma planilha Excel (.xlsx)."
+            except zipfile.BadZipFile as e:
+                return False, f"O arquivo '{path.name}' está corrompido (falha na descompressão ZIP): {e}"
+            except Exception as e:
+                return False, f"Erro ao verificar integridade do arquivo '{path.name}': {e}"
+
+            wb = None
+            try:
+                wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+                if not wb.sheetnames:
+                    return False, f"A planilha '{path.name}' não contém nenhuma aba legível."
+                first_sheet = wb[wb.sheetnames[0]]
+                _ = first_sheet.max_row
+            except Exception as e:
+                return False, f"O arquivo Excel '{path.name}' está corrompido e não pôde ser aberto: {e}"
+            finally:
+                if wb is not None:
+                    try:
+                        wb.close()
+                    except Exception:
+                        pass
+
+            return True, ""
+
+        elif ext == ".xls":
+            try:
+                with open(file_path, "rb") as f:
+                    header = f.read(8)
+                if header != b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
+                    return False, f"O arquivo '{path.name}' não possui cabeçalho binário válido do formato .xls."
+                return True, ""
+            except Exception as e:
+                return False, f"Erro ao validar arquivo .xls '{path.name}': {e}"
+
+        else:
+            return False, f"Extensão '{ext}' não é suportada para validação de Excel."
+
+    @staticmethod
+    def validate_excel(file_path: str) -> None:
+        """
+        Valida que o arquivo Excel abre corretamente antes do processamento.
+
+        Raises:
+            FileNotFoundError: Se o arquivo não existir.
+            CorruptedFileError: Se o arquivo estiver vazio, corrompido ou ilegível.
+        """
+        is_valid, motivo = DataCleaner.is_excel_valid(file_path)
+        if not is_valid:
+            if "não encontrado" in motivo.lower():
+                raise FileNotFoundError(motivo)
+            raise CorruptedFileError(motivo)
+
+    @staticmethod
+    def validate_file(file_path: str) -> None:
+        """
+        Valida que o arquivo (Excel, PDF ou CSV) pode ser aberto e lido antes de processar.
+
+        Raises:
+            FileNotFoundError: Se o arquivo não existir.
+            CorruptedFileError: Se o arquivo estiver corrompido ou ilegível.
+        """
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Arquivo não encontrado: '{file_path}'")
+        if path.stat().st_size == 0:
+            raise CorruptedFileError(f"O arquivo '{path.name}' está vazio (0 bytes) e não pode ser processado.")
+
+        ext = path.suffix.lower()
+        if ext in [".xlsx", ".xls"]:
+            DataCleaner.validate_excel(file_path)
+        elif ext == ".pdf":
+            try:
+                import pdfplumber
+                with pdfplumber.open(file_path) as pdf:
+                    if not pdf.pages:
+                        raise CorruptedFileError(f"O arquivo PDF '{path.name}' não possui páginas válidas.")
+            except CorruptedFileError:
+                raise
+            except Exception as e:
+                raise CorruptedFileError(f"O arquivo PDF '{path.name}' está corrompido ou ilegível: {e}")
+        elif ext == ".csv":
+            try:
+                with open(file_path, "rb") as f:
+                    sample = f.read(8192)
+                if b"\x00" in sample:
+                    raise CorruptedFileError(f"O arquivo CSV '{path.name}' contém bytes nulos inválidos.")
+            except CorruptedFileError:
+                raise
+            except Exception as e:
+                raise CorruptedFileError(f"Erro ao validar arquivo CSV '{path.name}': {e}")
+
+    @staticmethod
     def _detect_bank_from_content(df: pd.DataFrame, file_path: str = "") -> str:
         """Detecção inteligente do banco analisando cabeçalhos e conteúdo inicial do arquivo."""
         try:
@@ -83,6 +218,7 @@ class DataCleaner:
 
     @staticmethod
     def clean_argos(file_path: str) -> pd.DataFrame:
+        DataCleaner.validate_excel(file_path)
         try:
             import pandas as pd
             df = pd.read_excel(file_path, engine='openpyxl')
@@ -156,8 +292,12 @@ class DataCleaner:
             df['Histórico'] = df['Histórico'].fillna('')
             
             return df.dropna(subset=['Valor'])
+        except (CorruptedFileError, FileNotFoundError):
+            raise
+        except (zipfile.BadZipFile, openpyxl.utils.exceptions.InvalidFileException) as exc:
+            raise CorruptedFileError(f"O arquivo '{Path(file_path).name}' está corrompido: {exc}") from exc
         except Exception as e:
-            print(f"Erro ao ler Argos {file_path}: {e}")
+            logger.error(f"Erro ao ler Argos {file_path}: {e}")
             return pd.DataFrame()
 
     @staticmethod
@@ -279,6 +419,7 @@ class DataCleaner:
 
     @staticmethod
     def clean_bank(file_path: str) -> pd.DataFrame:
+        DataCleaner.validate_file(file_path)
         try:
             import pandas as pd
             
@@ -355,8 +496,12 @@ class DataCleaner:
             df['Banco'] = banco_detectado
             
             return df
+        except (CorruptedFileError, FileNotFoundError):
+            raise
+        except (zipfile.BadZipFile, openpyxl.utils.exceptions.InvalidFileException) as exc:
+            raise CorruptedFileError(f"O arquivo '{Path(file_path).name}' está corrompido: {exc}") from exc
         except Exception as e:
-            print(f"Erro ao ler Banco {file_path}: {e}")
+            logger.error(f"Erro ao ler Banco {file_path}: {e}")
             return pd.DataFrame()
 
 
