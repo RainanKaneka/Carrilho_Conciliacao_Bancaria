@@ -78,6 +78,10 @@ TOLERANCIA_INTEGRIDADE: float = _get_float_env("CONCILIACAO_TOLERANCIA_INTEGRIDA
 # Evita explosão combinatória O(N^k) em bases volumosas.
 MAX_COMBINACOES: int = _get_int_env("CONCILIACAO_MAX_COMBINACOES", 4)
 
+# Timeout configurável (em segundos) para abortar buscas de combinações longas.
+# Evita travamentos completos do pipeline ao rodar itertools.combinations com datasets grandes.
+TIMEOUT_COMBINACOES_SEGUNDOS: float = _get_float_env("CONCILIACAO_TIMEOUT_COMBINACOES", 5.0)
+
 # ==============================================================================
 # SEGURANÇA & CORS (ORIGENS PERMITIDAS)
 # ==============================================================================

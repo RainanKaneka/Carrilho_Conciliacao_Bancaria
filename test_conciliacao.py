@@ -1113,6 +1113,32 @@ class TestResumoExecutivo(unittest.TestCase):
         self.assertEqual(len(metricas["Assinatura Digital (Hash SHA-256)"]), 64)
 
 
+class TestTimeoutCombinacoes(unittest.TestCase):
+    def test_timeout_combinacoes_aborta_busca(self):
+        """Um timeout de 0.0 segundos deve abortar imediatamente o itertools.combinations e pular a Regra 3."""
+        df_argos = pd.DataFrame([
+            {"Banco": "BANCO", "Cliente": "CLI_1", "Valor": 10.00, "Data": "01/01/2026"},
+            {"Banco": "BANCO", "Cliente": "CLI_1", "Valor": 20.00, "Data": "01/01/2026"},
+            {"Banco": "BANCO", "Cliente": "CLI_1", "Valor": 30.00, "Data": "01/01/2026"},
+        ])
+        df_bank = pd.DataFrame([
+            {"Banco": "BANCO", "Data": "01/01/2026", "Valor": 60.00, "Histórico": "DEPOSITO"}
+        ])
+        
+        # Com timeout normal (5.0s), isso iria conciliar perfeitamente na Regra 3
+        # max_combinacoes=4 significa que testa 1, 2 e 3 combinações (já que range vai até max_combinacoes)
+        engine_normal = ReconciliationEngine(df_argos, df_bank, max_combinacoes=4, timeout_combinacoes=5.0)
+        res_normal = engine_normal.execute_pipeline()
+        self.assertEqual(len(res_normal["3_Conciliado_Desmembrado"]), 3)
+
+        # Com timeout de -1.0s, o loop aborta garantidamente na primeira iteração (resolvendo resolução de timer)
+        engine_timeout = ReconciliationEngine(df_argos, df_bank, max_combinacoes=4, timeout_combinacoes=-1.0)
+        res_timeout = engine_timeout.execute_pipeline()
+        self.assertEqual(len(res_timeout["3_Conciliado_Desmembrado"]), 0)
+        self.assertEqual(len(res_timeout["5_Divergencias_Pendentes"]), 4)
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 

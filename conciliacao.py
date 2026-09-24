@@ -5,6 +5,7 @@ import re
 import pdfplumber
 import itertools
 import hashlib
+import time
 from datetime import datetime
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -21,6 +22,7 @@ from config import (
     LIMIAR_VALOR_FALTANTE_DESMEMBRAR,
     TOLERANCIA_INTEGRIDADE,
     MAX_COMBINACOES,
+    TIMEOUT_COMBINACOES_SEGUNDOS,
 )
 
 def parse_currency(val, default=None):
@@ -369,6 +371,7 @@ class ReconciliationEngine:
         max_combinacoes: int = config.MAX_COMBINACOES,
         tolerancia_desconto_pix: float = config.TOLERANCIA_DESCONTO_PIX,
         janela_dias_centavos: int = config.JANELA_DIAS_CENTAVOS,
+        timeout_combinacoes: float = config.TIMEOUT_COMBINACOES_SEGUNDOS,
     ):
         import pandas as pd
         
@@ -377,6 +380,7 @@ class ReconciliationEngine:
         self.max_combinacoes = int(max_combinacoes) if max_combinacoes is not None else config.MAX_COMBINACOES
         self.tolerancia_desconto_pix = float(tolerancia_desconto_pix) if tolerancia_desconto_pix is not None else config.TOLERANCIA_DESCONTO_PIX
         self.janela_dias_centavos = int(janela_dias_centavos) if janela_dias_centavos is not None else config.JANELA_DIAS_CENTAVOS
+        self.timeout_combinacoes = float(timeout_combinacoes) if timeout_combinacoes is not None else config.TIMEOUT_COMBINACOES_SEGUNDOS
 
         self.df_argos = df_argos.copy() if isinstance(df_argos, pd.DataFrame) else pd.DataFrame()
         self.df_bank = df_bank.copy() if isinstance(df_bank, pd.DataFrame) else pd.DataFrame()
@@ -611,12 +615,18 @@ class ReconciliationEngine:
                                 outras_notas = argos_pendentes[filter_mask]
                                 fast_notas = [(row['ID_Argos'], row['Valor'], row.to_dict()) for idx, row in outras_notas.iterrows()]
                                 
+                                start_time = time.time()
                                 for r in range(1, min(self.max_combinacoes, len(fast_notas) + 1)):
+                                    if time.time() - start_time > self.timeout_combinacoes:
+                                        break
                                     for comb in itertools.combinations(fast_notas, r):
+                                        if time.time() - start_time > self.timeout_combinacoes:
+                                            break
                                         if abs(sum(item[1] for item in comb) - valor_faltante) <= self.tolerancia_centavos:
                                             comb_encontrada = [item[2].copy() for item in comb]
                                             break
-                                    if comb_encontrada: break
+                                    if comb_encontrada or time.time() - start_time > self.timeout_combinacoes: 
+                                        break
                             
                             if comb_encontrada:
                                 nota_principal = row_a.to_dict().copy()
@@ -820,12 +830,19 @@ class ReconciliationEngine:
             for cliente, grupo in argos_candidatos.groupby(col_cliente):
                 if len(grupo) < 2: continue
                 fast_grupo = [(row['ID_Argos'], row['Valor'], row.to_dict()) for idx, row in grupo.iterrows()]
+                
+                start_time = time.time()
                 for r in range(2, min(self.max_combinacoes, len(fast_grupo) + 1)):
+                    if time.time() - start_time > self.timeout_combinacoes:
+                        break
                     for comb in itertools.combinations(fast_grupo, r):
+                        if time.time() - start_time > self.timeout_combinacoes:
+                            break
                         if abs(sum(item[1] for item in comb) - valor_banco) <= self.tolerancia_centavos:
                             comb_encontrada = comb
                             break
-                    if comb_encontrada: break
+                    if comb_encontrada or time.time() - start_time > self.timeout_combinacoes:
+                        break
                 if comb_encontrada: break
                             
             if comb_encontrada:
