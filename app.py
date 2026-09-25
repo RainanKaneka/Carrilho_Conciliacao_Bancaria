@@ -79,7 +79,7 @@ class AnotacaoUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 try:
     import config
-    from conciliacao import DataCleaner, ReconciliationEngine, ExcelReporter, CorruptedFileError
+    from conciliacao import DataCleaner, ReconciliationEngine, ExcelReporter, CorruptedFileError, AnalyticsService
 except ImportError as exc:
     print(
         f"[ERRO FATAL] Não foi possível importar 'conciliacao.py' ou 'config.py'.\n"
@@ -541,6 +541,33 @@ async def conciliar(
 # Endpoints de Histórico e Arquivo Morto
 # ---------------------------------------------------------------------------
 
+def _carregar_historico_completo() -> List[dict]:
+    """
+    Carrega todos os registros de conciliações do banco de dados.
+    Tenta primeiro via Supabase; se indisponível ou em ambiente local/testes,
+    utiliza fallback transparente para o SQLite local (historico.db).
+    """
+    if supabase_client:
+        try:
+            res = supabase_client.table("conciliacoes").select("*").order("data_processamento", desc=True).execute()
+            if res.data:
+                return res.data
+        except Exception as exc:
+            logger.warning(f"Supabase indisponível no momento, utilizando fallback local SQLite: {exc}")
+
+    # Fallback transparente para banco SQLite local
+    db_path = Path(__file__).parent / "historico.db"
+    if db_path.exists():
+        try:
+            with sqlite3.connect(str(db_path)) as con:
+                con.row_factory = sqlite3.Row
+                rows = con.execute("SELECT * FROM conciliacoes ORDER BY data_processamento DESC").fetchall()
+                return [dict(r) for r in rows]
+        except Exception as e:
+            logger.warning(f"Erro ao ler historico.db local: {e}")
+    return []
+
+
 @app.get("/api/historico", tags=["Histórico"])
 async def obter_historico(user: dict = Depends(get_current_user)) -> JSONResponse:
     """
@@ -548,11 +575,38 @@ async def obter_historico(user: dict = Depends(get_current_user)) -> JSONRespons
     ordenada da mais recente para a mais antiga.
     """
     try:
-        res = supabase_client.table("conciliacoes").select("*").order("data_processamento", desc=True).execute()
-        return JSONResponse(content=res.data)
+        dados = _carregar_historico_completo()
+        return JSONResponse(content=dados)
     except Exception as exc:
         logger.error(f"Erro ao buscar histórico: {exc}")
         raise HTTPException(status_code=500, detail="Erro ao ler o histórico do banco de dados.")
+
+
+@app.get("/api/analytics/resumo", tags=["Analytics"])
+async def obter_resumo_analytics(
+    banco: str = None,
+    dias: int = None,
+    tipo_sucesso: str = None,
+    busca: str = None,
+    user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """
+    Retorna métricas consolidadas, KPIs, distribuição por tipo e séries temporais
+    para o Dashboard Analytics com suporte a filtros dinâmicos por banco, período e tipo de conciliação.
+    """
+    try:
+        registros = _carregar_historico_completo()
+        dashboard_data = AnalyticsService.gerar_dashboard_analytics(
+            registros=registros,
+            banco=banco,
+            dias=dias,
+            tipo_sucesso=tipo_sucesso,
+            busca=busca,
+        )
+        return JSONResponse(content=dashboard_data)
+    except Exception as exc:
+        logger.error(f"Erro ao gerar resumo analytics: {exc}")
+        raise HTTPException(status_code=500, detail="Erro ao gerar resumo analítico do histórico.")
 
 @app.get("/api/download/{id}", tags=["Histórico"])
 async def baixar_arquivo_antigo(id: int, user: dict = Depends(get_current_user)):

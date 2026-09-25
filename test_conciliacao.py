@@ -35,6 +35,7 @@ from conciliacao import (
     ReconciliationEngine,
     ExcelReporter,
     CorruptedFileError,
+    AnalyticsService,
 )
 
 
@@ -1295,6 +1296,222 @@ class TestTratamentoArquivosCorrompidos(unittest.TestCase):
                 "corrompido" in data_resp["detail"].lower()
                 or "integridade" in data_resp["detail"].lower()
             )
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestAnalyticsService(unittest.TestCase):
+    """
+    Testes unitários e de integração para AnalyticsService (Fase 3.1)
+    e para o endpoint GET /api/analytics/resumo da API FastAPI.
+    """
+
+    def setUp(self):
+        from datetime import datetime, timedelta
+        hoje = datetime.now()
+        dez_dias_atras = hoje - timedelta(days=10)
+        sessenta_dias_atras = hoje - timedelta(days=60)
+
+        self.registros_amostra = [
+            {
+                "id": "rec-1",
+                "data_processamento": hoje.isoformat(),
+                "periodo": "01/09/2026 a 15/09/2026 | Bancos: ITAU, BRADESCO",
+                "taxa_sucesso": 100.0,
+                "perfeitos": 8,
+                "historico": 2,
+                "desmembrados": 0,
+                "saidas_estornos": 1,
+                "divergencias": 0,
+                "anotacao": "Conciliação quinzenal Itaú e Bradesco sem erros",
+            },
+            {
+                "id": "rec-2",
+                "data_processamento": dez_dias_atras.isoformat(),
+                "periodo": "01/08/2026 a 31/08/2026 | Bancos: SANTANDER",
+                "taxa_sucesso": 75.0,
+                "perfeitos": 5,
+                "historico": 1,
+                "desmembrados": 0,
+                "saidas_estornos": 0,
+                "divergencias": 2,
+                "anotacao": "Auditoria de rotina Santander com pequenas divergencias",
+            },
+            {
+                "id": "rec-3",
+                "data_processamento": sessenta_dias_atras.isoformat(),
+                "periodo": "01/07/2026 a 31/07/2026 | Bancos: ITAU",
+                "taxa_sucesso": 40.0,
+                "perfeitos": 2,
+                "historico": 0,
+                "desmembrados": 0,
+                "saidas_estornos": 0,
+                "divergencias": 3,
+                "anotacao": "Lote antigo com pendencias",
+            },
+        ]
+
+    def test_extrair_bancos_de_periodo(self):
+        """Valida extração correta de bancos a partir da string do período."""
+        p1 = "01/01/2026 a 31/01/2026 | Bancos: ITAU, BRADESCO, SANTANDER"
+        bancos = AnalyticsService.extrair_bancos_de_periodo(p1)
+        self.assertEqual(bancos, ["ITAU", "BRADESCO", "SANTANDER"])
+
+        # Sem sufixo de bancos ou vazio
+        self.assertEqual(AnalyticsService.extrair_bancos_de_periodo("01/01/2026 a 31/01/2026"), [])
+        self.assertEqual(AnalyticsService.extrair_bancos_de_periodo(""), [])
+        self.assertEqual(AnalyticsService.extrair_bancos_de_periodo(None), [])
+
+    def test_filtrar_registros_por_banco(self):
+        """Valida filtragem precisa por nome do banco (insensível a maiúsculas)."""
+        # Filtrar por ITAU (deve retornar rec-1 e rec-3)
+        res_itau = AnalyticsService.filtrar_registros(self.registros_amostra, banco="ITAU")
+        self.assertEqual(len(res_itau), 2)
+        self.assertEqual({r["id"] for r in res_itau}, {"rec-1", "rec-3"})
+
+        # Filtrar por SANTANDER (deve retornar rec-2)
+        res_sant = AnalyticsService.filtrar_registros(self.registros_amostra, banco="santander")
+        self.assertEqual(len(res_sant), 1)
+        self.assertEqual(res_sant[0]["id"], "rec-2")
+
+        # Filtrar por 'todos' ou vazio (deve retornar todos os 3)
+        self.assertEqual(len(AnalyticsService.filtrar_registros(self.registros_amostra, banco="todos")), 3)
+        self.assertEqual(len(AnalyticsService.filtrar_registros(self.registros_amostra, banco="")), 3)
+
+        # Filtrar por banco inexistente
+        self.assertEqual(len(AnalyticsService.filtrar_registros(self.registros_amostra, banco="NUBANK")), 0)
+
+    def test_filtrar_registros_por_periodo_dias(self):
+        """Valida corte cronológico por número de dias a partir de hoje."""
+        # Últimos 15 dias: deve trazer rec-1 (hoje) e rec-2 (10 dias atrás), excluindo rec-3 (60 dias atrás)
+        res_15d = AnalyticsService.filtrar_registros(self.registros_amostra, dias=15)
+        self.assertEqual(len(res_15d), 2)
+        self.assertEqual({r["id"] for r in res_15d}, {"rec-1", "rec-2"})
+
+        # Últimos 5 dias: apenas rec-1 (hoje)
+        res_5d = AnalyticsService.filtrar_registros(self.registros_amostra, dias=5)
+        self.assertEqual(len(res_5d), 1)
+        self.assertEqual(res_5d[0]["id"], "rec-1")
+
+        # Últimos 90 dias: traz todos os 3
+        res_90d = AnalyticsService.filtrar_registros(self.registros_amostra, dias=90)
+        self.assertEqual(len(res_90d), 3)
+
+    def test_filtrar_registros_por_tipo_sucesso(self):
+        """Valida filtro por faixas de performance e existência de divergências."""
+        # Alta (>= 80%): rec-1 (100%)
+        res_alta = AnalyticsService.filtrar_registros(self.registros_amostra, tipo_sucesso="alta")
+        self.assertEqual(len(res_alta), 1)
+        self.assertEqual(res_alta[0]["id"], "rec-1")
+
+        # Média (50% a 79%): rec-2 (75%)
+        res_media = AnalyticsService.filtrar_registros(self.registros_amostra, tipo_sucesso="media")
+        self.assertEqual(len(res_media), 1)
+        self.assertEqual(res_media[0]["id"], "rec-2")
+
+        # Baixa (< 50%): rec-3 (40%)
+        res_baixa = AnalyticsService.filtrar_registros(self.registros_amostra, tipo_sucesso="baixa")
+        self.assertEqual(len(res_baixa), 1)
+        self.assertEqual(res_baixa[0]["id"], "rec-3")
+
+        # Perfeito (100% sem divergências): rec-1
+        res_perfeito = AnalyticsService.filtrar_registros(self.registros_amostra, tipo_sucesso="perfeito")
+        self.assertEqual(len(res_perfeito), 1)
+        self.assertEqual(res_perfeito[0]["id"], "rec-1")
+
+        # Com divergências: rec-2 (2 divs) e rec-3 (3 divs)
+        res_div = AnalyticsService.filtrar_registros(self.registros_amostra, tipo_sucesso="divergencias")
+        self.assertEqual(len(res_div), 2)
+        self.assertEqual({r["id"] for r in res_div}, {"rec-2", "rec-3"})
+
+    def test_filtrar_registros_por_busca_texto(self):
+        """Valida busca textual por ID, período ou anotação."""
+        res_anotacao = AnalyticsService.filtrar_registros(self.registros_amostra, busca="auditoria")
+        self.assertEqual(len(res_anotacao), 1)
+        self.assertEqual(res_anotacao[0]["id"], "rec-2")
+
+        res_id = AnalyticsService.filtrar_registros(self.registros_amostra, busca="rec-3")
+        self.assertEqual(len(res_id), 1)
+        self.assertEqual(res_id[0]["id"], "rec-3")
+
+    def test_calcular_metricas_e_resiliencia_vazio(self):
+        """Calcula métricas agregadas consolidadas e testa resiliência para lista vazia."""
+        metricas = AnalyticsService.calcular_metricas(self.registros_amostra)
+
+        # Total conciliados: (8+2+0+1) + (5+1+0+0) + (2+0+0+0) = 11 + 6 + 2 = 19
+        # Total divergências: 0 + 2 + 3 = 5
+        # Total transações: 19 + 5 = 24
+        # Taxa média ponderada: 19 / 24 * 100 = 79.17%
+        self.assertEqual(metricas["total_conciliacoes"], 3)
+        self.assertEqual(metricas["total_conciliados"], 19)
+        self.assertEqual(metricas["total_divergencias"], 5)
+        self.assertEqual(metricas["total_transacoes"], 24)
+        self.assertAlmostEqual(metricas["taxa_media_sucesso"], 79.17, places=1)
+        self.assertIn("ITAU", metricas["bancos_detectados"])
+        self.assertIn("BRADESCO", metricas["bancos_detectados"])
+        self.assertIn("SANTANDER", metricas["bancos_detectados"])
+
+        # Caso lista vazia (não deve dar divisão por zero)
+        vazio = AnalyticsService.calcular_metricas([])
+        self.assertEqual(vazio["total_conciliacoes"], 0)
+        self.assertEqual(vazio["taxa_media_sucesso"], 0.0)
+        self.assertEqual(vazio["total_transacoes"], 0)
+        self.assertEqual(vazio["bancos_detectados"], [])
+
+    def test_calcular_series_temporal(self):
+        """Testa geração da série temporal ordenada e formatação de pontos."""
+        series = AnalyticsService.calcular_series_temporal(self.registros_amostra, max_pontos=2)
+        # Deve respeitar max_pontos limitando aos 2 mais recentes (rec-2 e rec-1)
+        self.assertEqual(len(series), 2)
+        self.assertEqual(series[0]["id"], "rec-2")
+        self.assertEqual(series[1]["id"], "rec-1")
+        self.assertIn("periodo_label", series[0])
+        self.assertIn("taxa_sucesso", series[0])
+
+        # Lista vazia retorna lista vazia
+        self.assertEqual(AnalyticsService.calcular_series_temporal([]), [])
+
+    def test_gerar_dashboard_analytics_completo(self):
+        """Valida que o pacote gerado por gerar_dashboard_analytics contém toda a estrutura esperada pelo frontend."""
+        dashboard = AnalyticsService.gerar_dashboard_analytics(
+            registros=self.registros_amostra,
+            banco="ITAU",
+            dias=30,
+        )
+        self.assertIn("filtros_aplicados", dashboard)
+        self.assertEqual(dashboard["filtros_aplicados"]["banco"], "ITAU")
+        self.assertEqual(dashboard["filtros_aplicados"]["dias"], 30)
+        self.assertIn("metricas", dashboard)
+        self.assertIn("series_temporal", dashboard)
+        self.assertIn("bancos_disponiveis", dashboard)
+        self.assertEqual(dashboard["total_registros_brutos"], 3)
+        self.assertEqual(dashboard["total_registros_filtrados"], 1)  # apenas rec-1 atende ITAU + 30 dias
+
+    def test_api_endpoint_analytics_resumo(self):
+        """Testa a integração via HTTP com o endpoint GET /api/analytics/resumo."""
+        from fastapi.testclient import TestClient
+        from app import app, get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: {"id": "test_analytics_user"}
+        client = TestClient(app)
+
+        try:
+            # 1. Chamada geral sem parâmetros
+            resp = client.get("/api/analytics/resumo")
+            self.assertEqual(resp.status_code, 200)
+            data = resp.json()
+            self.assertIn("metricas", data)
+            self.assertIn("series_temporal", data)
+            self.assertIn("bancos_disponiveis", data)
+            self.assertIn("filtros_aplicados", data)
+            self.assertIn("total_geral_historico", data)
+
+            # 2. Chamada com filtros específicos (banco e dias)
+            resp_filtro = client.get("/api/analytics/resumo?banco=ITAU&dias=90&tipo_sucesso=todos")
+            self.assertEqual(resp_filtro.status_code, 200)
+            data_filtro = resp_filtro.json()
+            self.assertEqual(data_filtro["filtros_aplicados"]["banco"], "ITAU")
+            self.assertEqual(data_filtro["filtros_aplicados"]["dias"], 90)
         finally:
             app.dependency_overrides.clear()
 

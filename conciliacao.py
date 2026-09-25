@@ -1422,5 +1422,307 @@ class ExcelReporter:
         return file_hash
 
 
+class AnalyticsService:
+    """
+    Serviço de análise de dados históricos e inteligência de conciliação (Dashboard Analytics).
+    Permite filtragem por banco, período e tipo de conciliação, gerando métricas agregadas e séries temporais.
+    """
+
+    @staticmethod
+    def extrair_bancos_de_periodo(periodo_str: str) -> list:
+        """
+        Extrai a lista de bancos de uma string de período no padrão '... | Bancos: B1, B2'.
+        """
+        if not periodo_str:
+            return []
+        periodo_s = str(periodo_str)
+        if "| Bancos:" not in periodo_s:
+            return []
+        try:
+            raw_bancos = periodo_s.split("| Bancos:")[1].strip()
+            return [b.strip() for b in raw_bancos.split(",") if b.strip()]
+        except Exception:
+            return []
+
+    @staticmethod
+    def filtrar_registros(
+        registros: list,
+        banco: str = None,
+        dias: int = None,
+        tipo_sucesso: str = None,
+        busca: str = None,
+    ) -> list:
+        """
+        Filtra uma lista de registros de histórico com base nos critérios fornecidos.
+        """
+        if not registros:
+            return []
+
+        resultado = list(registros)
+
+        # 1. Filtro por Banco
+        if banco and str(banco).strip().lower() not in ["todos", "todos os bancos", ""]:
+            banco_filtro = str(banco).strip().upper()
+            filtrados = []
+            for r in resultado:
+                periodo_val = str(r.get("periodo", "") or "").upper()
+                banco_val = str(r.get("banco", "") or "").upper()
+                bancos_lista = [b.upper() for b in AnalyticsService.extrair_bancos_de_periodo(periodo_val)]
+
+                if banco_filtro in bancos_lista or banco_filtro in periodo_val or banco_filtro in banco_val:
+                    filtrados.append(r)
+                elif banco_filtro in ["OUTROS", "GERAL", "DESCONHECIDO"] and not bancos_lista:
+                    filtrados.append(r)
+            resultado = filtrados
+
+        # 2. Filtro por Período em Dias
+        if dias is not None and dias > 0:
+            from datetime import datetime, timedelta
+            limite = datetime.now() - timedelta(days=dias)
+            filtrados = []
+            for r in resultado:
+                dt_val = r.get("data_processamento")
+                if dt_val:
+                    try:
+                        if isinstance(dt_val, datetime):
+                            dt = dt_val
+                        else:
+                            clean_dt_str = str(dt_val).replace("T", " ").split(".")[0]
+                            dt = datetime.fromisoformat(clean_dt_str)
+                        if dt >= limite:
+                            filtrados.append(r)
+                    except Exception:
+                        filtrados.append(r)
+            resultado = filtrados
+
+        # 3. Filtro por Tipo de Sucesso / Desempenho
+        if tipo_sucesso and str(tipo_sucesso).strip().lower() not in ["todos", ""]:
+            tipo = str(tipo_sucesso).strip().lower()
+            filtrados = []
+            for r in resultado:
+                taxa = float(r.get("taxa_sucesso", 0.0) or 0.0)
+                divs = int(r.get("divergencias", 0) or 0)
+
+                if tipo in ["alta", "alto", ">=80"]:
+                    if taxa >= 80.0:
+                        filtrados.append(r)
+                elif tipo in ["media", "medio", "50-79"]:
+                    if 50.0 <= taxa < 80.0:
+                        filtrados.append(r)
+                elif tipo in ["baixa", "baixo", "<50"]:
+                    if taxa < 50.0:
+                        filtrados.append(r)
+                elif tipo in ["perfeito", "100"]:
+                    if taxa >= 99.99 and divs == 0:
+                        filtrados.append(r)
+                elif tipo in ["com_divergencias", "divergencias"]:
+                    if divs > 0:
+                        filtrados.append(r)
+                else:
+                    filtrados.append(r)
+            resultado = filtrados
+
+        # 4. Filtro por Busca Textual Livre
+        if busca and str(busca).strip():
+            termo = str(busca).strip().lower()
+            filtrados = []
+            for r in resultado:
+                periodo_str = str(r.get("periodo", "") or "").lower()
+                anotacao_str = str(r.get("anotacao", "") or "").lower()
+                id_str = str(r.get("id", "") or "").lower()
+                if termo in periodo_str or termo in anotacao_str or termo == id_str:
+                    filtrados.append(r)
+            resultado = filtrados
+
+        return resultado
+
+    @staticmethod
+    def calcular_metricas(registros: list) -> dict:
+        """
+        Calcula as métricas globais consolidadas e KPIs a partir dos registros.
+        """
+        if not registros:
+            return {
+                "total_conciliacoes": 0,
+                "taxa_media_sucesso": 0.0,
+                "taxa_media_aritmetica": 0.0,
+                "total_transacoes": 0,
+                "total_conciliados": 0,
+                "total_divergencias": 0,
+                "distribuicao_tipos": {
+                    "perfeitos": 0,
+                    "historico": 0,
+                    "desmembrados": 0,
+                    "saidas_estornos": 0,
+                    "divergencias": 0,
+                },
+                "percentuais_tipos": {
+                    "perfeitos": 0.0,
+                    "historico": 0.0,
+                    "desmembrados": 0.0,
+                    "saidas_estornos": 0.0,
+                    "divergencias": 0.0,
+                },
+                "bancos_detectados": [],
+            }
+
+        total_conciliacoes = len(registros)
+        total_perfeitos = sum(int(r.get("perfeitos", 0) or 0) for r in registros)
+        total_historico = sum(int(r.get("historico", 0) or 0) for r in registros)
+        total_desmembrados = sum(int(r.get("desmembrados", 0) or 0) for r in registros)
+        total_saidas_estornos = sum(int(r.get("saidas_estornos", 0) or 0) for r in registros)
+        total_divergencias = sum(int(r.get("divergencias", 0) or 0) for r in registros)
+
+        total_conciliados = (
+            total_perfeitos + total_historico + total_desmembrados + total_saidas_estornos
+        )
+        total_transacoes = total_conciliados + total_divergencias
+
+        # Taxa média ponderada
+        taxa_media_ponderada = (
+            round((total_conciliados / total_transacoes) * 100, 2)
+            if total_transacoes > 0
+            else 0.0
+        )
+
+        # Taxa média aritmética simples
+        taxas = [float(r.get("taxa_sucesso", 0.0) or 0.0) for r in registros]
+        taxa_media_aritmetica = round(sum(taxas) / len(taxas), 2) if taxas else 0.0
+
+        # Percentuais de cada tipo
+        pct = lambda val: round((val / total_transacoes * 100), 2) if total_transacoes > 0 else 0.0
+
+        percentuais = {
+            "perfeitos": pct(total_perfeitos),
+            "historico": pct(total_historico),
+            "desmembrados": pct(total_desmembrados),
+            "saidas_estornos": pct(total_saidas_estornos),
+            "divergencias": pct(total_divergencias),
+        }
+
+        # Bancos detectados
+        bancos_set = set()
+        for r in registros:
+            p = str(r.get("periodo", "") or "")
+            for b in AnalyticsService.extrair_bancos_de_periodo(p):
+                bancos_set.add(b)
+            if r.get("banco"):
+                bancos_set.add(str(r.get("banco")).strip())
+
+        return {
+            "total_conciliacoes": total_conciliacoes,
+            "taxa_media_sucesso": taxa_media_ponderada,
+            "taxa_media_aritmetica": taxa_media_aritmetica,
+            "total_transacoes": total_transacoes,
+            "total_conciliados": total_conciliados,
+            "total_divergencias": total_divergencias,
+            "distribuicao_tipos": {
+                "perfeitos": total_perfeitos,
+                "historico": total_historico,
+                "desmembrados": total_desmembrados,
+                "saidas_estornos": total_saidas_estornos,
+                "divergencias": total_divergencias,
+            },
+            "percentuais_tipos": percentuais,
+            "bancos_detectados": sorted(list(bancos_set)),
+        }
+
+    @staticmethod
+    def calcular_series_temporal(registros: list, max_pontos: int = 15) -> list:
+        """
+        Prepara a série temporal cronológica para plotagem em gráficos de linha e barras.
+        """
+        if not registros:
+            return []
+
+        def _get_dt(r):
+            dt = r.get("data_processamento", "")
+            return str(dt)
+
+        ordenados = sorted(registros, key=_get_dt)
+        if max_pontos and len(ordenados) > max_pontos:
+            ordenados = ordenados[-max_pontos:]
+
+        series = []
+        for r in ordenados:
+            periodo_raw = str(r.get("periodo", "") or "Desconhecido")
+            periodo_curto = periodo_raw.split(" | ")[0]
+            bancos = AnalyticsService.extrair_bancos_de_periodo(periodo_raw)
+
+            perfeitos = int(r.get("perfeitos", 0) or 0)
+            historico = int(r.get("historico", 0) or 0)
+            desmembrados = int(r.get("desmembrados", 0) or 0)
+            saidas = int(r.get("saidas_estornos", 0) or 0)
+            divergencias = int(r.get("divergencias", 0) or 0)
+            conciliados = perfeitos + historico + desmembrados + saidas
+
+            series.append({
+                "id": r.get("id"),
+                "data_processamento": str(r.get("data_processamento", "")),
+                "periodo_label": periodo_curto,
+                "periodo_completo": periodo_raw,
+                "bancos": bancos,
+                "taxa_sucesso": round(float(r.get("taxa_sucesso", 0.0) or 0.0), 2),
+                "conciliados": conciliados,
+                "divergencias": divergencias,
+                "total": conciliados + divergencias,
+                "perfeitos": perfeitos,
+                "historico": historico,
+                "desmembrados": desmembrados,
+                "saidas_estornos": saidas,
+            })
+
+        return series
+
+    @staticmethod
+    def gerar_dashboard_analytics(
+        registros: list,
+        banco: str = None,
+        dias: int = None,
+        tipo_sucesso: str = None,
+        busca: str = None,
+    ) -> dict:
+        """
+        Gera o pacote consolidado de inteligência para o Dashboard Analytics.
+        """
+        todos = list(registros or [])
+        filtrados = AnalyticsService.filtrar_registros(
+            registros=todos,
+            banco=banco,
+            dias=dias,
+            tipo_sucesso=tipo_sucesso,
+            busca=busca,
+        )
+
+        metricas = AnalyticsService.calcular_metricas(filtrados)
+        series = AnalyticsService.calcular_series_temporal(filtrados)
+
+        todos_bancos = set()
+        for r in todos:
+            p = str(r.get("periodo", "") or "")
+            for b in AnalyticsService.extrair_bancos_de_periodo(p):
+                todos_bancos.add(b)
+            if r.get("banco"):
+                todos_bancos.add(str(r.get("banco")).strip())
+
+        return {
+            "filtros_aplicados": {
+                "banco": banco,
+                "dias": dias,
+                "tipo_sucesso": tipo_sucesso,
+                "busca": busca,
+            },
+            "total_geral_historico": len(todos),
+            "total_filtrado": len(filtrados),
+            "total_registros_brutos": len(todos),
+            "total_registros_filtrados": len(filtrados),
+            "metricas": metricas,
+            "distribuicao": metricas["distribuicao_tipos"],
+            "percentuais": metricas["percentuais_tipos"],
+            "series_temporal": series,
+            "bancos_disponiveis": sorted(list(todos_bancos)),
+        }
+
+
 if __name__ == "__main__":
     pass

@@ -586,16 +586,183 @@
           <p class="text-gray-400 text-sm">Acompanhe a evolução da sua conciliação ao longo do tempo</p>
         </div>
 
-        <!-- Charts -->
-        <div id="charts-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-100">
-            <h4 class="font-bold text-gray-800 text-sm mb-4">Evolução da Taxa de Sucesso (%)</h4>
-            <div class="relative h-64">
-              <canvas id="chart-taxa"></canvas>
+        <!-- Enhanced Analytics Filter Bar -->
+        <div id="analytics-filter-bar" class="bg-white rounded-2xl shadow-card p-5 border border-gray-100 mb-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-green-50 text-[#038201] flex items-center justify-center font-bold">
+                <i class="ph ph-funnel text-base"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-gray-800 text-sm">Filtros do Dashboard</h4>
+                <p class="text-xs text-gray-400">Refine as métricas e gráficos por banco, data e status</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="analytics-count-badge" class="px-2.5 py-1 text-xs font-bold rounded-full bg-green-50 text-[#038201] border border-green-100">
+                Carregando...
+              </span>
+              <button onclick="limparFiltrosAnalytics()" title="Resetar filtros" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-gray-500 hover:text-gray-800 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors">
+                <i class="ph ph-arrow-counter-clockwise text-sm"></i> Limpar
+              </button>
             </div>
           </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <!-- Filtro Banco -->
+            <div>
+              <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                <i class="ph ph-bank mr-1"></i> Banco
+              </label>
+              <select id="filter-banco" onchange="aplicarFiltrosAnalytics()"
+                class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 outline-none focus:border-[#038201] focus:bg-white transition-all cursor-pointer">
+                <option value="todos">Todos os Bancos</option>
+              </select>
+            </div>
+
+            <!-- Filtro Período -->
+            <div>
+              <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                <i class="ph ph-calendar mr-1"></i> Período
+              </label>
+              <select id="filter-periodo" onchange="aplicarFiltrosAnalytics()"
+                class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 outline-none focus:border-[#038201] focus:bg-white transition-all cursor-pointer">
+                <option value="todos">Todo o Histórico</option>
+                <option value="7">Últimos 7 dias</option>
+                <option value="15">Últimos 15 dias</option>
+                <option value="30">Últimos 30 dias</option>
+                <option value="90">Últimos 90 dias</option>
+                <option value="2026">Ano 2026</option>
+              </select>
+            </div>
+
+            <!-- Filtro Tipo / Performance -->
+            <div>
+              <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                <i class="ph ph-chart-line-up mr-1"></i> Desempenho / Status
+              </label>
+              <select id="filter-tipo" onchange="aplicarFiltrosAnalytics()"
+                class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 outline-none focus:border-[#038201] focus:bg-white transition-all cursor-pointer">
+                <option value="todos">Todos os Status</option>
+                <option value="alta">Alta Performance (Taxa ≥ 80%)</option>
+                <option value="media">Atenção (Taxa 50% - 79%)</option>
+                <option value="baixa">Baixa Performance (Taxa < 50%)</option>
+                <option value="perfeito">100% Conciliado (Zero Divergência)</option>
+                <option value="divergencias">Com Divergências Pendentes</option>
+              </select>
+            </div>
+
+            <!-- Busca Rápida -->
+            <div>
+              <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                <i class="ph ph-magnifying-glass mr-1"></i> Busca Rápida
+              </label>
+              <div class="relative">
+                <input id="filter-busca" type="text" oninput="aplicarFiltrosAnalytics()" placeholder="Filtrar período ou nota..."
+                  class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 outline-none focus:border-[#038201] focus:bg-white transition-all" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 KPI Summary Cards -->
+        <div id="analytics-kpi-container" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div class="bg-white rounded-2xl shadow-card p-5 border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Taxa Média</span>
+              <span id="kpi-taxa-badge" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-green-50 text-[#038201]">
+                <i class="ph ph-check mr-1"></i> Ótimo
+              </span>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span id="kpi-taxa-media" class="text-2xl font-black text-gray-800">--%</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1">Média ponderada do período</p>
+          </div>
+
+          <div class="bg-white rounded-2xl shadow-card p-5 border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Transações</span>
+              <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                <i class="ph ph-receipt text-sm"></i>
+              </div>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span id="kpi-total-transacoes" class="text-2xl font-black text-gray-800">--</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1">Volume total processado</p>
+          </div>
+
+          <div class="bg-white rounded-2xl shadow-card p-5 border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Conciliados</span>
+              <div class="w-7 h-7 rounded-lg bg-green-50 text-[#038201] flex items-center justify-center">
+                <i class="ph ph-check-circle text-sm"></i>
+              </div>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span id="kpi-total-conciliados" class="text-2xl font-black text-[#038201]">--</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1">Perfeitos, Histórico e Desmembrados</p>
+          </div>
+
+          <div class="bg-white rounded-2xl shadow-card p-5 border border-gray-100 flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Divergências</span>
+              <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                <i class="ph ph-warning-circle text-sm"></i>
+              </div>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span id="kpi-total-divergencias" class="text-2xl font-black text-amber-500">--</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1">Lançamentos aguardando resolução</p>
+          </div>
+        </div>
+
+        <!-- 3 Interactive Charts -->
+        <div id="charts-container" class="space-y-6 mb-8">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-100 lg:col-span-2">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h4 class="font-bold text-gray-800 text-sm">Evolução da Taxa de Sucesso (%)</h4>
+                  <p class="text-xs text-gray-400">Tendência histórica cronológica por conciliação</p>
+                </div>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-50 text-[#038201]">
+                  <i class="ph ph-trend-up mr-1"></i> Performance
+                </span>
+              </div>
+              <div class="relative h-64">
+                <canvas id="chart-taxa"></canvas>
+              </div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-100">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h4 class="font-bold text-gray-800 text-sm">Distribuição por Tipo</h4>
+                  <p class="text-xs text-gray-400">Composição dos lançamentos</p>
+                </div>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-600">
+                  <i class="ph ph-chart-pie-slice mr-1"></i> Tipos
+                </span>
+              </div>
+              <div class="relative h-64">
+                <canvas id="chart-doughnut"></canvas>
+              </div>
+            </div>
+          </div>
+
           <div class="bg-white rounded-2xl shadow-card p-6 border border-gray-100">
-            <h4 class="font-bold text-gray-800 text-sm mb-4">Sucesso vs Divergências (Qtd)</h4>
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h4 class="font-bold text-gray-800 text-sm">Volume Comparativo: Conciliados vs Divergências (Qtd)</h4>
+                <p class="text-xs text-gray-400">Distribuição absoluta por lote processado</p>
+              </div>
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-600">
+                <i class="ph ph-chart-bar mr-1"></i> Volume
+              </span>
+            </div>
             <div class="relative h-64">
               <canvas id="chart-barras"></canvas>
             </div>
@@ -1237,8 +1404,12 @@
       updateButton();
 
       // ----- FUNCIONALIDADE DAS ABAS E HISTÓRICO -----
+      // ----- FUNCIONALIDADE DAS ABAS E HISTÓRICO / ANALYTICS -----
       let chartTaxaInstance = null;
       let chartBarrasInstance = null;
+      let chartDoughnutInstance = null;
+      window.historicoOriginal = [];
+      window.historicoFiltrado = [];
 
       async function switchTab(tab) {
         const isNova = tab === 'nova';
@@ -1263,20 +1434,174 @@
           const resp = await fetch(API_BASE + '/api/historico');
           if (!resp.ok) throw new Error('Falha ao carregar histórico.');
           const data = await resp.json();
-          renderHistorico(data);
+          window.historicoOriginal = data || [];
+          popularFiltroBancos(window.historicoOriginal);
+          aplicarFiltrosAnalytics();
         } catch (err) {
           console.error(err);
           showToast('Erro', 'Não foi possível carregar o histórico.', 'error');
         }
       }
 
-      function renderHistorico(data) {
-        const tbody = document.getElementById('tabela-historico');
+      function popularFiltroBancos(data) {
+        const selectBanco = document.getElementById('filter-banco');
+        if (!selectBanco) return;
+        const valorAtual = selectBanco.value || 'todos';
+
+        const bancosSet = new Set();
+        (data || []).forEach(r => {
+          const info = extractPeriodoAndBancos(r.periodo);
+          info.bancosList.forEach(b => {
+            if (b && b.trim()) bancosSet.add(b.trim().toUpperCase());
+          });
+          if (r.banco) bancosSet.add(String(r.banco).trim().toUpperCase());
+        });
+
+        let optionsHtml = '<option value="todos">Todos os Bancos</option>';
+        Array.from(bancosSet).sort().forEach(b => {
+          optionsHtml += `<option value="${b}">${b}</option>`;
+        });
+        selectBanco.innerHTML = optionsHtml;
+        if (Array.from(bancosSet).includes(valorAtual)) {
+          selectBanco.value = valorAtual;
+        } else {
+          selectBanco.value = 'todos';
+        }
+      }
+
+      function aplicarFiltrosAnalytics() {
+        const data = window.historicoOriginal || [];
+        const bancoFiltro = (document.getElementById('filter-banco')?.value || 'todos').toUpperCase();
+        const periodoFiltro = document.getElementById('filter-periodo')?.value || 'todos';
+        const tipoFiltro = document.getElementById('filter-tipo')?.value || 'todos';
+        const buscaTermo = (document.getElementById('filter-busca')?.value || '').toLowerCase().trim();
+
+        const agora = new Date();
+
+        const filtrados = data.filter(r => {
+          // 1. Filtro Banco
+          if (bancoFiltro !== 'TODOS') {
+            const info = extractPeriodoAndBancos(r.periodo);
+            const bancos = info.bancosList.map(b => b.toUpperCase());
+            const pUpper = String(r.periodo || '').toUpperCase();
+            const bUpper = String(r.banco || '').toUpperCase();
+            const match = bancos.includes(bancoFiltro) || pUpper.includes(bancoFiltro) || bUpper.includes(bancoFiltro);
+            if (!match) return false;
+          }
+
+          // 2. Filtro Período Temporal
+          if (periodoFiltro !== 'todos') {
+            const dt = new Date(r.data_processamento);
+            if (!isNaN(dt.getTime())) {
+              const diffDias = (agora - dt) / (1000 * 60 * 60 * 24);
+              if (periodoFiltro === '7' && diffDias > 7) return false;
+              if (periodoFiltro === '15' && diffDias > 15) return false;
+              if (periodoFiltro === '30' && diffDias > 30) return false;
+              if (periodoFiltro === '90' && diffDias > 90) return false;
+              if (periodoFiltro === '2026' && dt.getFullYear() !== 2026) return false;
+            }
+          }
+
+          // 3. Filtro Status / Desempenho
+          if (tipoFiltro !== 'todos') {
+            const taxa = parseFloat(r.taxa_sucesso || 0);
+            const divs = parseInt(r.divergencias || 0);
+            if (tipoFiltro === 'alta' && taxa < 80.0) return false;
+            if (tipoFiltro === 'media' && (taxa < 50.0 || taxa >= 80.0)) return false;
+            if (tipoFiltro === 'baixa' && taxa >= 50.0) return false;
+            if (tipoFiltro === 'perfeito' && (taxa < 99.99 || divs > 0)) return false;
+            if (tipoFiltro === 'divergencias' && divs <= 0) return false;
+          }
+
+          // 4. Busca Textual
+          if (buscaTermo) {
+            const pStr = String(r.periodo || '').toLowerCase();
+            const aStr = String(r.anotacao || '').toLowerCase();
+            const idStr = String(r.id || '').toLowerCase();
+            if (!pStr.includes(buscaTermo) && !aStr.includes(buscaTermo) && idStr !== buscaTermo) {
+              return false;
+            }
+          }
+
+          return true;
+        });
+
+        window.historicoFiltrado = filtrados;
+
+        // Atualiza Badge Contador
+        const badgeCounter = document.getElementById('analytics-count-badge');
+        if (badgeCounter) {
+          badgeCounter.textContent = `${filtrados.length} de ${data.length} conciliações`;
+        }
+
+        // Atualiza Cards de KPI
+        atualizarKPICards(filtrados);
+
+        // Atualiza Gráficos
+        atualizarGraficos(filtrados);
+
+        // Renderiza Tabela
+        renderHistorico(filtrados);
+      }
+
+      function limparFiltrosAnalytics() {
+        if (document.getElementById('filter-banco')) document.getElementById('filter-banco').value = 'todos';
+        if (document.getElementById('filter-periodo')) document.getElementById('filter-periodo').value = 'todos';
+        if (document.getElementById('filter-tipo')) document.getElementById('filter-tipo').value = 'todos';
+        if (document.getElementById('filter-busca')) document.getElementById('filter-busca').value = '';
+        aplicarFiltrosAnalytics();
+      }
+
+      function atualizarKPICards(filtrados) {
+        let totalPerfeitos = 0;
+        let totalHistorico = 0;
+        let totalDesmembrados = 0;
+        let totalSaidas = 0;
+        let totalDivergencias = 0;
+
+        filtrados.forEach(r => {
+          totalPerfeitos += parseInt(r.perfeitos || 0);
+          totalHistorico += parseInt(r.historico || 0);
+          totalDesmembrados += parseInt(r.desmembrados || 0);
+          totalSaidas += parseInt(r.saidas_estornos || 0);
+          totalDivergencias += parseInt(r.divergencias || 0);
+        });
+
+        const totalConciliados = totalPerfeitos + totalHistorico + totalDesmembrados + totalSaidas;
+        const totalTransacoes = totalConciliados + totalDivergencias;
+        const taxaPonderada = totalTransacoes > 0 ? ((totalConciliados / totalTransacoes) * 100).toFixed(1) : '0.0';
+
+        const elTaxa = document.getElementById('kpi-taxa-media');
+        const elTotal = document.getElementById('kpi-total-transacoes');
+        const elConciliados = document.getElementById('kpi-total-conciliados');
+        const elDivergencias = document.getElementById('kpi-total-divergencias');
+        const elBadge = document.getElementById('kpi-taxa-badge');
+
+        if (elTaxa) elTaxa.textContent = taxaPonderada + '%';
+        if (elTotal) elTotal.textContent = totalTransacoes.toLocaleString('pt-BR');
+        if (elConciliados) elConciliados.textContent = totalConciliados.toLocaleString('pt-BR');
+        if (elDivergencias) elDivergencias.textContent = totalDivergencias.toLocaleString('pt-BR');
+
+        if (elBadge) {
+          const numTaxa = parseFloat(taxaPonderada);
+          if (numTaxa >= 80) {
+            elBadge.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-green-50 text-[#038201]';
+            elBadge.innerHTML = '<i class="ph ph-check mr-1"></i> Ótimo';
+          } else if (numTaxa >= 50) {
+            elBadge.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-600';
+            elBadge.innerHTML = '<i class="ph ph-warning mr-1"></i> Atenção';
+          } else {
+            elBadge.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-50 text-red-600';
+            elBadge.innerHTML = '<i class="ph ph-x mr-1"></i> Baixo';
+          }
+        }
+      }
+
+      function atualizarGraficos(filtrados) {
         const chartsContainer = document.getElementById('charts-container');
         const emptyState = document.getElementById('historico-empty');
 
-        if (!data || data.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-gray-400">Nenhum histórico encontrado.</td></tr>';
+        if (!filtrados || filtrados.length === 0) {
           if (chartsContainer) chartsContainer.classList.add('hidden');
           if (emptyState) emptyState.classList.remove('hidden');
           return;
@@ -1284,6 +1609,153 @@
 
         if (chartsContainer) chartsContainer.classList.remove('hidden');
         if (emptyState) emptyState.classList.add('hidden');
+
+        // Prepara dados cronológicos (últimos 15 registros)
+        const ultimos = [...filtrados].reverse().slice(-15);
+        const labels = ultimos.map(r => (r.periodo || 'Desconhecido').split(' | ')[0]);
+        const taxas = ultimos.map(r => parseFloat(r.taxa_sucesso || 0));
+        const conciliaArr = ultimos.map(r => parseInt(r.perfeitos || 0) + parseInt(r.historico || 0) + parseInt(r.desmembrados || 0) + parseInt(r.saidas_estornos || 0));
+        const divArr = ultimos.map(r => parseInt(r.divergencias || 0));
+
+        // Gráfico 1: Linha de Taxa de Sucesso (%)
+        const ctxTaxa = document.getElementById('chart-taxa')?.getContext('2d');
+        if (ctxTaxa) {
+          if (chartTaxaInstance) chartTaxaInstance.destroy();
+          chartTaxaInstance = new Chart(ctxTaxa, {
+            type: 'line',
+            data: {
+              labels: labels,
+              datasets: [{
+                label: 'Taxa de Sucesso (%)',
+                data: taxas,
+                borderColor: '#038201',
+                backgroundColor: 'rgba(3,130,1,0.08)',
+                fill: true,
+                tension: 0.35,
+                borderWidth: 2.5,
+                pointBackgroundColor: '#038201',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: function (ctx) { return `Taxa: ${ctx.parsed.y.toFixed(1)}%`; }
+                  }
+                }
+              },
+              scales: {
+                y: { min: 0, max: 100, ticks: { callback: v => v + '%' } },
+                x: { grid: { display: false } }
+              }
+            }
+          });
+        }
+
+        // Gráfico 2: Doughnut por Tipo
+        let totalP = 0, totalH = 0, totalD = 0, totalS = 0, totalDiv = 0;
+        filtrados.forEach(r => {
+          totalP += parseInt(r.perfeitos || 0);
+          totalH += parseInt(r.historico || 0);
+          totalD += parseInt(r.desmembrados || 0);
+          totalS += parseInt(r.saidas_estornos || 0);
+          totalDiv += parseInt(r.divergencias || 0);
+        });
+
+        const ctxDoughnut = document.getElementById('chart-doughnut')?.getContext('2d');
+        if (ctxDoughnut) {
+          if (chartDoughnutInstance) chartDoughnutInstance.destroy();
+          chartDoughnutInstance = new Chart(ctxDoughnut, {
+            type: 'doughnut',
+            data: {
+              labels: ['1. Perfeito', '2. Histórico', '3. Desmembrado', '4. Saídas/Estornos', '5. Divergências'],
+              datasets: [{
+                data: [totalP, totalH, totalD, totalS, totalDiv],
+                backgroundColor: ['#038201', '#10b981', '#3b82f6', '#8b5cf6', '#f59e0b'],
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                hoverOffset: 6
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              cutout: '68%',
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: { boxWidth: 10, font: { size: 10, weight: 'bold' }, padding: 8 }
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function (ctx) {
+                      const dataset = ctx.dataset;
+                      const total = dataset.data.reduce((a, b) => a + b, 0);
+                      const val = ctx.parsed;
+                      const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                      return ` ${ctx.label}: ${val.toLocaleString('pt-BR')} (${pct}%)`;
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
+
+        // Gráfico 3: Barras Empilhadas
+        const ctxBarras = document.getElementById('chart-barras')?.getContext('2d');
+        if (ctxBarras) {
+          if (chartBarrasInstance) chartBarrasInstance.destroy();
+          chartBarrasInstance = new Chart(ctxBarras, {
+            type: 'bar',
+            data: {
+              labels: labels,
+              datasets: [
+                { label: 'Conciliados', data: conciliaArr, backgroundColor: '#038201', borderRadius: 4 },
+                { label: 'Divergências', data: divArr, backgroundColor: '#f59e0b', borderRadius: 4 }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11, weight: 'bold' } } },
+                tooltip: {
+                  callbacks: {
+                    afterBody: function (items) {
+                      const idx = items[0].dataIndex;
+                      const c = conciliaArr[idx] || 0;
+                      const d = divArr[idx] || 0;
+                      const tot = c + d;
+                      const tx = tot > 0 ? ((c / tot) * 100).toFixed(1) : 0;
+                      return `Total: ${tot.toLocaleString('pt-BR')} | Sucesso: ${tx}%`;
+                    }
+                  }
+                }
+              },
+              scales: {
+                x: { stacked: true, grid: { display: false } },
+                y: { stacked: true }
+              }
+            }
+          });
+        }
+      }
+
+      function renderHistorico(data) {
+        const tbody = document.getElementById('tabela-historico');
+
+        if (!data || data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="py-12 text-center text-gray-400 font-medium">Nenhuma conciliação encontrada com os filtros selecionados.<br><button onclick="limparFiltrosAnalytics()" class="mt-2 text-xs text-[#038201] font-bold hover:underline">Limpar Filtros</button></td></tr>';
+          return;
+        }
 
         window.historicoData = data; // Armazena globalmente para usar nas anotações
 
@@ -1354,49 +1826,6 @@
         </tr>
       `;
         }).join('');
-
-        // Prepara dados para os gráficos (últimos 10 registros cronológicos)
-        const ultimos = data.slice(0, 10).reverse();
-        const labels = ultimos.map(r => (r.periodo || 'Desconhecido').split(' | ')[0]);
-        const taxas = ultimos.map(r => r.taxa_sucesso || 0);
-        const conciliaArr = ultimos.map(r => r.perfeitos + r.historico + r.desmembrados + (r.saidas_estornos || 0));
-        const divArr = ultimos.map(r => r.divergencias);
-
-        // Gráfico 1: Linha
-        const ctxTaxa = document.getElementById('chart-taxa').getContext('2d');
-        if (chartTaxaInstance) chartTaxaInstance.destroy();
-        chartTaxaInstance = new Chart(ctxTaxa, {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: 'Taxa de Sucesso (%)', data: taxas,
-              borderColor: '#038201', backgroundColor: 'rgba(3,130,1,0.1)',
-              fill: true, tension: 0.4, borderWidth: 3,
-              pointBackgroundColor: '#038201', pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6
-            }]
-          },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100 } } }
-        });
-
-        // Gráfico 2: Barras Empilhadas
-        const ctxBarras = document.getElementById('chart-barras').getContext('2d');
-        if (chartBarrasInstance) chartBarrasInstance.destroy();
-        chartBarrasInstance = new Chart(ctxBarras, {
-          type: 'bar',
-          data: {
-            labels: labels,
-            datasets: [
-              { label: 'Conciliados', data: conciliaArr, backgroundColor: '#038201', borderRadius: 4 },
-              { label: 'Divergências', data: divArr, backgroundColor: '#f59e0b', borderRadius: 4 }
-            ]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom' } },
-            scales: { x: { stacked: true }, y: { stacked: true } }
-          }
-        });
       }
 
 
