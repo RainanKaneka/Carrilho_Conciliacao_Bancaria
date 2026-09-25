@@ -1516,6 +1516,92 @@ class TestAnalyticsService(unittest.TestCase):
             app.dependency_overrides.clear()
 
 
+class TestBancoNordesteEEntradasVazias(unittest.TestCase):
+    """
+    Testes unitários e de integração para arquivos do Banco do Nordeste (BNB)
+    e comportamento da conciliação quando uma ou ambas as fontes estão vazias.
+    """
+
+    def test_deteccao_bnb_por_nome_e_conteudo(self):
+        """Valida que arquivos com 'nordeste' ou 'bnb' são identificados como BNB."""
+        df_fake = pd.DataFrame([{"col1": "teste"}])
+        banco_argos = DataCleaner._detect_bank_from_content(df_fake, "26 - Banco Nordeste G00017.xlsx")
+        self.assertEqual(banco_argos, "BNB")
+
+        banco_pdf = DataCleaner._detect_bank_from_content(df_fake, "ExtratoContaCorrenteBNB (2).pdf")
+        self.assertEqual(banco_pdf, "BNB")
+
+    def test_clean_bank_pdf_bnb_real(self):
+        """Valida a leitura do extrato real BNB em PDF, garantindo extração de dezenas de transações e créditos."""
+        caminho_pdf = os.path.join(os.path.dirname(__file__), "bnb", "ExtratoContaCorrenteBNB (2).pdf")
+        if not os.path.exists(caminho_pdf):
+            self.skipTest(f"Arquivo de teste não encontrado: {caminho_pdf}")
+
+        df_bank = DataCleaner.clean_bank(caminho_pdf)
+        self.assertFalse(df_bank.empty)
+        self.assertGreaterEqual(len(df_bank), 40)
+        self.assertEqual(df_bank["Banco"].iloc[0], "BNB")
+        self.assertIn("1.600,00", [f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") for v in df_bank["Valor"]])
+
+    def test_conciliacao_real_bnb_argos_concilia_todas_as_baixas(self):
+        """Valida que o arquivo Argos do BNB tem 100% das suas 7 baixas conciliadas contra o extrato BNB."""
+        caminho_argos = os.path.join(os.path.dirname(__file__), "bnb", "26 - Banco Nordeste G00017.xlsx")
+        caminho_pdf = os.path.join(os.path.dirname(__file__), "bnb", "ExtratoContaCorrenteBNB (2).pdf")
+
+        if not os.path.exists(caminho_argos) or not os.path.exists(caminho_pdf):
+            self.skipTest("Arquivos BNB de teste não encontrados.")
+
+        df_argos = DataCleaner.clean_argos(caminho_argos)
+        df_bank = DataCleaner.clean_bank(caminho_pdf)
+
+        self.assertEqual(len(df_argos), 7)
+        self.assertGreaterEqual(len(df_bank), 40)
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        relatorios = engine.execute_pipeline()
+
+        qtd_perfeitos = len(relatorios.get("1_Conciliado_Perfeito", []))
+        qtd_desmembrados = len(relatorios.get("3_Conciliado_Desmembrado", []))
+        
+        # As 7 baixas do Argos devem estar completamente conciliadas (3 perfeitos + 4 desmembrados)
+        self.assertEqual(qtd_perfeitos + qtd_desmembrados, 7)
+        
+        # Nenhuma baixa do Argos deve ter ficado em falta no banco
+        df_div = relatorios.get("5_Divergencias_Pendentes", pd.DataFrame())
+        argos_em_falta = df_div[df_div["Motivo Divergência"] == "Falta no Banco"]
+        self.assertEqual(len(argos_em_falta), 0)
+
+    def test_pipeline_quando_apenas_banco_vazio_envia_argos_para_divergencias(self):
+        """Quando o banco estiver vazio, os registros do Argos não devem desaparecer: devem ir para Divergências."""
+        df_argos = pd.DataFrame([
+            {"Cliente": "CLIENTE TESTE", "Valor": 500.0, "Data": "10/01/2026", "Histórico": "PIX", "Banco": "BNB"}
+        ])
+        df_bank = pd.DataFrame()
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        relatorios = engine.execute_pipeline()
+
+        df_div = relatorios["5_Divergencias_Pendentes"]
+        self.assertEqual(len(df_div), 1)
+        self.assertEqual(df_div["Motivo Divergência"].iloc[0], "Falta no Banco")
+        self.assertEqual(df_div["Valor"].iloc[0], 500.0)
+
+    def test_pipeline_quando_apenas_argos_vazio_envia_banco_para_divergencias(self):
+        """Quando o Argos estiver vazio, os créditos do banco devem ir para Divergências."""
+        df_argos = pd.DataFrame()
+        df_bank = pd.DataFrame([
+            {"Histórico": "CREDITO PIX CLIENTE", "Valor": 1200.0, "Data": "10/01/2026", "Tipo": "C", "Banco": "BNB"}
+        ])
+
+        engine = ReconciliationEngine(df_argos, df_bank)
+        relatorios = engine.execute_pipeline()
+
+        df_div = relatorios["5_Divergencias_Pendentes"]
+        self.assertEqual(len(df_div), 1)
+        self.assertEqual(df_div["Motivo Divergência"].iloc[0], "Sobrou no Banco / Faltou no Argos")
+        self.assertEqual(df_div["Valor"].iloc[0], 1200.0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 

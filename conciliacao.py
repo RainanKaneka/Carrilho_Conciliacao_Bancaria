@@ -203,8 +203,16 @@ class DataCleaner:
                 return "CAIXA ECONOMICA"
             if "banese" in content or "banco do estado de sergipe" in content:
                 return "BANESE"
-            if "banco do nordeste" in content or "bnb" in content:
+            if "banco do nordeste" in content or "bnb" in content or "nordeste" in content:
                 return "BNB"
+            if "sicoob" in content or "nature" in content:
+                return "SICOOB"
+            if "bradesco" in content:
+                return "BRADESCO"
+            if "itau" in content or "itaú" in content:
+                return "ITAU"
+            if "santander" in content:
+                return "SANTANDER"
         except Exception:
             pass
             
@@ -213,6 +221,16 @@ class DataCleaner:
             return 'CAIXA ECONOMICA'
         elif 'banese' in nome_arquivo: 
             return 'BANESE'
+        elif 'bnb' in nome_arquivo or 'nordeste' in nome_arquivo:
+            return 'BNB'
+        elif 'sicoob' in nome_arquivo or 'nature' in nome_arquivo:
+            return 'SICOOB'
+        elif 'bradesco' in nome_arquivo:
+            return 'BRADESCO'
+        elif 'itau' in nome_arquivo or 'itaú' in nome_arquivo:
+            return 'ITAU'
+        elif 'santander' in nome_arquivo:
+            return 'SANTANDER'
             
         return "BANCO DESCONHECIDO"
 
@@ -384,32 +402,83 @@ class DataCleaner:
     def _read_bnb_pdf(file_path: str) -> pd.DataFrame:
         data = []
         with pdfplumber.open(file_path) as pdf:
+            # 1. Tentar primeiro extração estruturada de tabelas (ideal para o layout do Banco do Nordeste)
             for page in pdf.pages:
-                text = page.extract_text()
-                if not text:
-                    continue
-                
-                lines = text.split('\n')
-                for line in lines:
-                    line = line.strip()
-                    match = re.search(r'^(\d{2}/\d{2}/\d{4})\s+(.*?)\s+(\d+)\s+(-?\s*[\d\.]+,\d{2})\s+([\d\.]+,\d{2})$', line)
-                    if match:
-                        date_str = match.group(1)
-                        historico = match.group(2).strip()
-                        valor_str = match.group(4).replace(' ', '')
+                tables = page.extract_tables() or []
+                for table in tables:
+                    for row in table:
+                        if not row or len(row) < 3:
+                            continue
+                        col0 = str(row[0] or '').strip()
+                        # Verifica se primeira coluna é data DD/MM/AAAA
+                        if not re.match(r'^\d{2}/\d{2}/\d{4}$', col0):
+                            continue
                         
-                        if '-' in valor_str:
-                            tipo = 'D'
-                            valor_str = valor_str.replace('-', '')
-                        else:
-                            tipo = 'C'
+                        data_str = col0
+                        hist_raw = str(row[1] or '').strip()
+                        hist_clean = ' '.join(hist_raw.split()) if hist_raw else ''
+                        
+                        # Localiza a coluna de valor (no BNB tipicamente row[3])
+                        val_str = None
+                        if len(row) >= 4 and row[3] is not None:
+                            val_candidate = str(row[3]).strip()
+                            if re.search(r'-?\s*[\d\.]+,\d{2}', val_candidate):
+                                val_str = val_candidate
+                        
+                        if val_str is None:
+                            for c in reversed(row[1:]):
+                                c_str = str(c or '').strip()
+                                if re.search(r'^-?\s*[\d\.]+,\d{2}$', c_str):
+                                    val_str = c_str
+                                    break
+                                    
+                        if not val_str:
+                            continue
+                            
+                        tipo = 'D' if '-' in val_str else 'C'
+                        val_clean = val_str.replace('-', '').strip()
                         
                         data.append({
-                            'Data': date_str,
-                            'Histórico': historico,
-                            'Valor': valor_str,
+                            'Data': data_str,
+                            'Histórico': hist_clean,
+                            'Valor': val_clean,
                             'Tipo': tipo
                         })
+            
+            # 2. Se nenhuma tabela foi encontrada ou extraída, fallback para regex linha a linha
+            if not data:
+                for page in pdf.pages:
+                    text = page.extract_text()
+                    if not text:
+                        continue
+                    
+                    lines = text.split('\n')
+                    for i, line in enumerate(lines):
+                        line_s = line.strip()
+                        match = re.search(
+                            r'^(\d{2}/\d{2}/\d{4})\s+(?:(.*?)\s+)?(\d+)\s+(-?\s*[\d\.]+,\d{2})\s+([\d\.]+,\d{2})$',
+                            line_s
+                        )
+                        if match:
+                            date_str = match.group(1)
+                            historico = (match.group(2) or '').strip()
+                            valor_str = match.group(4).replace(' ', '')
+                            
+                            if not historico and i + 1 < len(lines):
+                                next_l = lines[i+1].strip()
+                                if not re.match(r'^\d{2}/\d{2}/\d{4}', next_l) and not next_l.startswith('::'):
+                                    historico = next_l
+                            
+                            tipo = 'D' if '-' in valor_str else 'C'
+                            valor_str = valor_str.replace('-', '')
+                            
+                            data.append({
+                                'Data': date_str,
+                                'Histórico': historico,
+                                'Valor': valor_str,
+                                'Tipo': tipo
+                            })
+
         df = pd.DataFrame(data)
         if not df.empty:
             df['Valor'] = df['Valor'].apply(safe_float)
@@ -418,20 +487,43 @@ class DataCleaner:
         return df
 
     @staticmethod
-    def clean_bank(file_path: str) -> pd.DataFrame:
+    def clean_bank(file_path: str, banco_hint: str = None) -> pd.DataFrame:
         DataCleaner.validate_file(file_path)
         try:
             import pandas as pd
             
             if str(file_path).lower().endswith('.pdf'):
-                text = ""
+                hint_lower = str(banco_hint or '').lower()
+                path_lower = str(file_path).lower()
+                
+                # Coleta texto das primeiras páginas para detecção contextual
+                full_text = ""
                 with pdfplumber.open(file_path) as pdf:
-                    if pdf.pages:
-                        text = pdf.pages[0].extract_text() or ""
-                text_lower = text.lower()
-                if "banco do nordeste" in text_lower or "bnb" in text_lower:
+                    for p in pdf.pages[:5]:
+                        full_text += " " + (p.extract_text() or "")
+                text_lower = full_text.lower()
+                
+                is_bnb = (
+                    "bnb" in hint_lower or "nordeste" in hint_lower or
+                    "bnb" in path_lower or "nordeste" in path_lower or
+                    "banco do nordeste" in text_lower or "bnb" in text_lower or "fundo bn" in text_lower or
+                    ("extrato de conta corrente" in text_lower and "detalhamento do extrato" in text_lower)
+                )
+                
+                is_nature = (
+                    "nature" in hint_lower or "sicoob" in hint_lower or
+                    "nature" in path_lower or "sicoob" in path_lower or
+                    "transferência recebida pelo pix" in text_lower or "transferência recebida" in text_lower
+                )
+                
+                if is_bnb:
                     return DataCleaner._read_bnb_pdf(file_path)
+                elif is_nature:
+                    return DataCleaner._read_nature_pdf(file_path)
                 else:
+                    df_bnb = DataCleaner._read_bnb_pdf(file_path)
+                    if not df_bnb.empty:
+                        return df_bnb
                     return DataCleaner._read_nature_pdf(file_path)
                 
             df = pd.read_excel(file_path, engine='openpyxl')
@@ -614,18 +706,18 @@ class ReconciliationEngine:
             '5_Divergencias_Pendentes': []
         }
 
-        if self.df_argos.empty or self.df_bank.empty:
+        # Se AMBOS estiverem vazios
+        if self.df_argos.empty and self.df_bank.empty:
             for k in resultados.keys():
                 resultados[k] = pd.DataFrame(columns=['Banco', 'Cliente', 'Valor', 'Data', 'Histórico', 'Baixas', 'Data Baixa', 'Motivo Divergência', 'Regra Aplicada'])
             
-            soma_input = self.df_argos['Valor'].sum() if not self.df_argos.empty else 0.0
-            status_msg = "OK - Nenhum centavo perdido ou duplicado" if soma_input == 0 else "ERRO (Perda/Duplicação identificada)"
+            status_msg = "OK - Nenhum centavo perdido ou duplicado"
             df_integridade = pd.DataFrame([
-                {"Métrica": "Total Input Argos", "Valor": round(soma_input, 2)},
+                {"Métrica": "Total Input Argos", "Valor": 0.0},
                 {"Métrica": "Total Output Conciliado", "Valor": 0.0},
                 {"Métrica": "Total Output Divergências (Falta Banco)", "Valor": 0.0},
                 {"Métrica": "Total Output (Conciliado + Divergências)", "Valor": 0.0},
-                {"Métrica": "Diferença (Perda/Duplicação)", "Valor": round(soma_input, 2)},
+                {"Métrica": "Diferença (Perda/Duplicação)", "Valor": 0.0},
                 {"Métrica": "Status da Integridade", "Valor": status_msg},
             ])
 
@@ -639,9 +731,9 @@ class ReconciliationEngine:
                 {"Métrica": "Status da Conciliação", "Valor": "Entradas Vazias"},
                 {"Métrica": "Taxa de Sucesso (Registros)", "Valor": "0.00%"},
                 {"Métrica": "Taxa de Sucesso (Financeira)", "Valor": "0.00%"},
-                {"Métrica": "Total de Registros Argos", "Valor": len(self.df_argos)},
-                {"Métrica": "Total Volume Argos (R$)", "Valor": round(soma_input, 2)},
-                {"Métrica": "Total de Registros Banco", "Valor": len(self.df_bank)},
+                {"Métrica": "Total de Registros Argos", "Valor": 0},
+                {"Métrica": "Total Volume Argos (R$)", "Valor": 0.0},
+                {"Métrica": "Total de Registros Banco", "Valor": 0},
                 {"Métrica": "Total Volume Banco (R$)", "Valor": 0.0},
                 {"Métrica": "Total Conciliado (Registros)", "Valor": 0},
                 {"Métrica": "Total Conciliado (R$)", "Valor": 0.0},
@@ -655,6 +747,101 @@ class ReconciliationEngine:
                 {"Métrica": "Total Saídas / Estornos (R$)", "Valor": 0.0},
                 {"Métrica": "Total Divergências Pendentes (Registros)", "Valor": 0},
                 {"Métrica": "Total Divergências Pendentes (R$)", "Valor": 0.0},
+                {"Métrica": "Status de Integridade Financeira", "Valor": status_msg},
+                {"Métrica": "Assinatura Digital (Hash SHA-256)", "Valor": assinatura_sha256},
+            ])
+
+            return {
+                '0_Resumo_Executivo': df_executivo,
+                '1_Conciliado_Perfeito': resultados['1_Conciliado_Perfeito'],
+                '2_Conciliado_Via_Historico': resultados['2_Conciliado_Via_Historico'],
+                '3_Conciliado_Desmembrado': resultados['3_Conciliado_Desmembrado'],
+                '4_Saidas_Estornos': resultados['4_Saidas_Estornos'],
+                '5_Divergencias_Pendentes': resultados['5_Divergencias_Pendentes'],
+                '6_Resumo_Integridade': df_integridade,
+            }
+
+        # Se apenas um dos lados estiver vazio, direciona os registros para Divergências
+        if self.df_argos.empty or self.df_bank.empty:
+            for k in ['1_Conciliado_Perfeito', '2_Conciliado_Via_Historico', '3_Conciliado_Desmembrado']:
+                resultados[k] = pd.DataFrame(columns=['Banco', 'Cliente', 'Valor', 'Data', 'Histórico', 'Baixas', 'Data Baixa', 'Motivo Divergência', 'Regra Aplicada'])
+            
+            divergencias_list = []
+            if not self.df_argos.empty:
+                for _, row in self.df_argos.iterrows():
+                    divergencias_list.append({
+                        'Banco': row.get('Banco', ''),
+                        'Cliente': row.get('Cliente', ''),
+                        'Valor': row['Valor'],
+                        'Data': row.get('Data', ''),
+                        'Histórico': row.get('Histórico', ''),
+                        'Baixas': '',
+                        'Data Baixa': '',
+                        'Motivo Divergência': 'Falta no Banco',
+                        'Regra Aplicada': 'N/A'
+                    })
+            elif not self.df_bank.empty:
+                for _, row in self.df_bank.iterrows():
+                    divergencias_list.append({
+                        'Banco': row.get('Banco', ''),
+                        'Cliente': row.get('Histórico', ''),
+                        'Valor': row['Valor'],
+                        'Data': row.get('Data', ''),
+                        'Histórico': row.get('Histórico', ''),
+                        'Baixas': '',
+                        'Data Baixa': '',
+                        'Motivo Divergência': 'Sobrou no Banco / Faltou no Argos',
+                        'Regra Aplicada': 'N/A'
+                    })
+
+            resultados['5_Divergencias_Pendentes'] = pd.DataFrame(divergencias_list) if divergencias_list else pd.DataFrame(columns=['Banco', 'Cliente', 'Valor', 'Data', 'Histórico', 'Baixas', 'Data Baixa', 'Motivo Divergência', 'Regra Aplicada'])
+            resultados['4_Saidas_Estornos'] = self.df_saidas_estornos if hasattr(self, 'df_saidas_estornos') and isinstance(self.df_saidas_estornos, pd.DataFrame) else pd.DataFrame(columns=['Banco', 'Cliente', 'Valor', 'Data', 'Histórico', 'Baixas', 'Data Baixa', 'Motivo Divergência', 'Regra Aplicada'])
+
+            soma_argos = self.df_argos['Valor'].sum() if not self.df_argos.empty else 0.0
+            soma_div_argos = resultados['5_Divergencias_Pendentes'][resultados['5_Divergencias_Pendentes']['Motivo Divergência'] == 'Falta no Banco']['Valor'].sum() if not resultados['5_Divergencias_Pendentes'].empty else 0.0
+            diferenca = round(abs(soma_argos - soma_div_argos), 2)
+            status_msg = "OK - Nenhum centavo perdido ou duplicado" if diferenca == 0.0 else "ERRO (Perda/Duplicação identificada)"
+
+            df_integridade = pd.DataFrame([
+                {"Métrica": "Total Input Argos", "Valor": round(soma_argos, 2)},
+                {"Métrica": "Total Output Conciliado", "Valor": 0.0},
+                {"Métrica": "Total Output Divergências (Falta Banco)", "Valor": round(soma_div_argos, 2)},
+                {"Métrica": "Total Output (Conciliado + Divergências)", "Valor": round(soma_div_argos, 2)},
+                {"Métrica": "Diferença (Perda/Duplicação)", "Valor": diferenca},
+                {"Métrica": "Status da Integridade", "Valor": status_msg},
+            ])
+
+            timestamp_execucao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            assinatura_sha256 = self._calcular_assinatura_digital(
+                self.df_argos, self.df_bank, resultados, timestamp_execucao
+            )
+
+            qtd_saidas = len(resultados['4_Saidas_Estornos'])
+            vol_saidas = round(float(resultados['4_Saidas_Estornos']['Valor'].sum()), 2) if qtd_saidas > 0 else 0.0
+            qtd_divs = len(resultados['5_Divergencias_Pendentes'])
+            vol_divs = round(float(resultados['5_Divergencias_Pendentes']['Valor'].sum()), 2) if qtd_divs > 0 else 0.0
+
+            df_executivo = pd.DataFrame([
+                {"Métrica": "Data/Hora de Processamento", "Valor": timestamp_execucao},
+                {"Métrica": "Status da Conciliação", "Valor": "Entrada Parcial / Sem Correspondência"},
+                {"Métrica": "Taxa de Sucesso (Registros)", "Valor": "0.00%"},
+                {"Métrica": "Taxa de Sucesso (Financeira)", "Valor": "0.00%"},
+                {"Métrica": "Total de Registros Argos", "Valor": len(self.df_argos)},
+                {"Métrica": "Total Volume Argos (R$)", "Valor": round(soma_argos, 2)},
+                {"Métrica": "Total de Registros Banco", "Valor": len(self.df_bank)},
+                {"Métrica": "Total Volume Banco (R$)", "Valor": round(float(self.df_bank['Valor'].sum()), 2) if not self.df_bank.empty else 0.0},
+                {"Métrica": "Total Conciliado (Registros)", "Valor": 0},
+                {"Métrica": "Total Conciliado (R$)", "Valor": 0.0},
+                {"Métrica": "  - Match Perfeito (Qtd)", "Valor": 0},
+                {"Métrica": "  - Match Perfeito (R$)", "Valor": 0.0},
+                {"Métrica": "  - Via Histórico (Qtd)", "Valor": 0},
+                {"Métrica": "  - Via Histórico (R$)", "Valor": 0.0},
+                {"Métrica": "  - Desmembrado (Qtd)", "Valor": 0},
+                {"Métrica": "  - Desmembrado (R$)", "Valor": 0.0},
+                {"Métrica": "Total Saídas / Estornos (Registros)", "Valor": qtd_saidas},
+                {"Métrica": "Total Saídas / Estornos (R$)", "Valor": vol_saidas},
+                {"Métrica": "Total Divergências Pendentes (Registros)", "Valor": qtd_divs},
+                {"Métrica": "Total Divergências Pendentes (R$)", "Valor": vol_divs},
                 {"Métrica": "Status de Integridade Financeira", "Valor": status_msg},
                 {"Métrica": "Assinatura Digital (Hash SHA-256)", "Valor": assinatura_sha256},
             ])

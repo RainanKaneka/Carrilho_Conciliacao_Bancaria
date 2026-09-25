@@ -345,7 +345,7 @@ async def conciliar(
         logger.info(f"Processando {len(caminhos_argos)} arquivo(s) Argos...")
         dfs_argos: list = []
         for caminho in caminhos_argos:
-            logger.info(f"  → DataCleaner.clean_argos('{caminho.name}')")
+            logger.info(f"  -> DataCleaner.clean_argos('{caminho.name}')")
             df = DataCleaner.clean_argos(str(caminho))
             dfs_argos.append(df)
 
@@ -362,8 +362,8 @@ async def conciliar(
         logger.info(f"Processando {len(caminhos_banco)} arquivo(s) do banco '{banco_nome}'...")
         dfs_banco: list = []
         for caminho in caminhos_banco:
-            logger.info(f"  → DataCleaner.clean_bank('{caminho.name}')")
-            df = DataCleaner.clean_bank(str(caminho))
+            logger.info(f"  -> DataCleaner.clean_bank('{caminho.name}')")
+            df = DataCleaner.clean_bank(str(caminho), banco_hint=banco_nome)
             dfs_banco.append(df)
 
         if not dfs_banco:
@@ -413,7 +413,13 @@ async def conciliar(
         # Extrair bancos processados
         bancos_list = []
         if not df_banco_full.empty and 'Banco' in df_banco_full.columns:
-            bancos_list = df_banco_full['Banco'].dropna().unique().tolist()
+            bancos_list.extend(df_banco_full['Banco'].dropna().unique().tolist())
+        if not df_argos_full.empty and 'Banco' in df_argos_full.columns:
+            for b in df_argos_full['Banco'].dropna().unique().tolist():
+                if b not in ['ARGOS', 'BANCO DESCONHECIDO', ''] and b not in bancos_list:
+                    bancos_list.append(b)
+        if not bancos_list and banco_nome and banco_nome.lower() not in ['generico', '']:
+            bancos_list.append(banco_nome.upper())
         
         bancos_str = ", ".join(sorted(bancos_list)) if bancos_list else "Desconhecido"
 
